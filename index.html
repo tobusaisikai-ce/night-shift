@@ -1,0 +1,2860 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>CE 夜勤業務集計</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+:root {
+  --bg: #f0f4f8;
+  --surface: #ffffff;
+  --surface2: #f5f7fa;
+  --surface3: #edf0f5;
+  --border: #dde3eb;
+  --border2: #e8edf3;
+  --accent: #2563eb;
+  --accent-dim: rgba(37,99,235,0.08);
+  --green: #16a34a;
+  --green-dim: rgba(22,163,74,0.09);
+  --orange: #ea580c;
+  --orange-dim: rgba(234,88,12,0.09);
+  --red: #dc2626;
+  --red-dim: rgba(220,38,38,0.09);
+  --purple: #7c3aed;
+  --purple-dim: rgba(124,58,237,0.09);
+  --cyan: #0891b2;
+  --cyan-dim: rgba(8,145,178,0.09);
+  --yellow: #d97706;
+  --yellow-dim: rgba(217,119,6,0.09);
+  --text: #1e2a3a;
+  --text-muted: #64748b;
+  --text-dim: #94a3b8;
+  --radius: 12px;
+
+  /* カテゴリカラー */
+  --cat-r: #dc2626; --cat-r-bg: #fef2f2; --cat-r-border: #fecaca;
+  --cat-o: #ea580c; --cat-o-bg: #fff7ed; --cat-o-border: #fed7aa;
+  --cat-b: #2563eb; --cat-b-bg: #eff6ff; --cat-b-border: #bfdbfe;
+  --cat-c: #0891b2; --cat-c-bg: #ecfeff; --cat-c-border: #a5f3fc;
+  --cat-p: #7c3aed; --cat-p-bg: #f5f3ff; --cat-p-border: #ddd6fe;
+  --cat-g: #16a34a; --cat-g-bg: #f0fdf4; --cat-g-border: #bbf7d0;
+  --cat-y: #d97706; --cat-y-bg: #fffbeb; --cat-y-border: #fde68a;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+body { font-family: 'Noto Sans JP', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; padding-bottom: 80px; }
+
+/* ===== HEADER ===== */
+.app-header {
+  background: var(--accent);
+  padding: 13px 16px;
+  display: flex; align-items: center; gap: 12px;
+  position: sticky; top: 0; z-index: 200;
+  box-shadow: 0 2px 8px rgba(37,99,235,0.3);
+}
+.app-logo { font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 700; color: var(--accent); background: #fff; border-radius: 6px; padding: 3px 8px; letter-spacing: 0.1em; }
+.app-title { font-size: 15px; font-weight: 700; color: #fff; }
+
+/* ===== TAB BAR ===== */
+.tab-bar {
+  display: grid; grid-template-columns: repeat(5,1fr);
+  background: #fff;
+  border-bottom: 2px solid var(--border);
+  position: sticky; top: 51px; z-index: 190;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+}
+.tab-btn { font-family: 'Noto Sans JP', sans-serif; font-size: 11px; font-weight: 500; color: var(--text-muted); background: none; border: none; border-bottom: 3px solid transparent; margin-bottom: -2px; padding: 9px 4px; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 2px; transition: all 0.2s; }
+.tab-btn .ti { font-size: 16px; }
+.tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 700; }
+
+/* ===== PAGE ===== */
+.page { display: none; padding: 12px; max-width: 700px; margin: 0 auto; }
+.page.active { display: block; }
+
+/* ===== CARD ===== */
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px; margin-bottom: 10px; box-shadow: 0 1px 4px rgba(0,0,0,0.04); }
+.card-hdr { font-size: 11px; font-weight: 800; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+.card-hdr::before { content: ''; display: block; width: 4px; height: 14px; border-radius: 2px; flex-shrink: 0; }
+.c-blue::before { background: var(--accent); }
+.c-green::before { background: var(--green); }
+.c-orange::before { background: var(--orange); }
+.c-purple::before { background: var(--purple); }
+.c-cyan::before { background: var(--cyan); }
+.c-red::before { background: var(--red); }
+.c-yellow::before { background: var(--yellow); }
+
+/* ===== INPUTS ===== */
+.field-label { font-size: 12px; color: var(--text-muted); margin-bottom: 5px; font-weight: 600; }
+input[type="date"], input[type="text"], input[type="number"], select, textarea {
+  background: var(--surface2); border: 1.5px solid var(--border); border-radius: 9px;
+  color: var(--text); font-family: 'Noto Sans JP', sans-serif; font-size: 14px;
+  padding: 10px 12px; transition: border-color 0.2s, box-shadow 0.2s; outline: none; width: 100%;
+  box-sizing: border-box; min-width: 0;
+}
+input[type="date"] { -webkit-appearance: none; appearance: none; }
+input:focus, select:focus, textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(37,99,235,0.12); background: #fff; }
+textarea { height: 76px; resize: vertical; font-size: 13px; line-height: 1.6; }
+
+/* ===== STAFF GRID ===== */
+.staff-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 6px; }
+.s-chip { background: var(--surface2); border: 1.5px solid var(--border); border-radius: 8px; padding: 9px 4px; font-size: 12px; font-weight: 500; color: var(--text-muted); cursor: pointer; text-align: center; transition: all 0.15s; user-select: none; line-height: 1.2; }
+.s-chip:active { transform: scale(0.95); }
+.s-chip.sel { background: var(--accent-dim); border-color: var(--accent); color: var(--accent); font-weight: 700; }
+.s-chip.sel-g { background: var(--green-dim); border-color: var(--green); color: var(--green); font-weight: 700; }
+
+/* ===== TOGGLE ===== */
+.toggle-row { display: flex; gap: 8px; }
+.tgl-btn { flex: 1; padding: 11px; border-radius: 9px; border: 1.5px solid var(--border); background: var(--surface2); color: var(--text-muted); font-family: 'Noto Sans JP', sans-serif; font-size: 13px; font-weight: 600; cursor: pointer; text-align: center; transition: all 0.15s; }
+.tgl-btn:active { transform: scale(0.97); }
+.tgl-yes { background: #f0fdf4; border-color: var(--green); color: var(--green); font-weight: 700; box-shadow: 0 0 0 3px rgba(22,163,74,0.1); }
+.tgl-no { background: #fef2f2; border-color: var(--red); color: var(--red); font-weight: 700; box-shadow: 0 0 0 3px rgba(220,38,38,0.1); }
+
+/* ===== TASK GROUPS ===== */
+.tg-label { font-size: 12px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; padding: 10px 12px 8px; border-radius: 8px 8px 0 0; margin-bottom: 0; cursor: pointer; display: flex; align-items: center; justify-content: space-between; }
+.tg-label.collapsed { border-radius: 8px; margin-bottom: 4px; }
+.tg-toggle { font-size: 11px; transition: transform 0.2s; opacity: 0.7; }
+.tg-label.collapsed .tg-toggle { transform: rotate(-90deg); }
+.tg-count-badge { font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 20px; margin-left: 6px; }
+
+/* カテゴリ色 */
+.tg-cat-r { background: var(--cat-r-bg); color: var(--cat-r); border: 1.5px solid var(--cat-r-border); }
+.tg-cat-r .tg-count-badge { background: var(--cat-r); color: #fff; }
+.tg-cat-o { background: var(--cat-o-bg); color: var(--cat-o); border: 1.5px solid var(--cat-o-border); }
+.tg-cat-o .tg-count-badge { background: var(--cat-o); color: #fff; }
+.tg-cat-b { background: var(--cat-b-bg); color: var(--cat-b); border: 1.5px solid var(--cat-b-border); }
+.tg-cat-b .tg-count-badge { background: var(--cat-b); color: #fff; }
+.tg-cat-c { background: var(--cat-c-bg); color: var(--cat-c); border: 1.5px solid var(--cat-c-border); }
+.tg-cat-c .tg-count-badge { background: var(--cat-c); color: #fff; }
+.tg-cat-p { background: var(--cat-p-bg); color: var(--cat-p); border: 1.5px solid var(--cat-p-border); }
+.tg-cat-p .tg-count-badge { background: var(--cat-p); color: #fff; }
+.tg-cat-g { background: var(--cat-g-bg); color: var(--cat-g); border: 1.5px solid var(--cat-g-border); }
+.tg-cat-g .tg-count-badge { background: var(--cat-g); color: #fff; }
+.tg-cat-y { background: var(--cat-y-bg); color: var(--cat-y); border: 1.5px solid var(--cat-y-border); }
+.tg-cat-y .tg-count-badge { background: var(--cat-y); color: #fff; }
+
+.collapsible-content { overflow: hidden; transition: max-height 0.3s ease; }
+.collapsible-content.hidden { max-height: 0 !important; }
+.task-list { display: flex; flex-direction: column; gap: 4px; padding: 6px 0 6px; margin-bottom: 8px; }
+
+/* ===== TASK ROW ===== */
+.task-row {
+  display: flex; flex-direction: column; align-items: stretch; gap: 8px;
+  background: var(--surface2); border: 1.5px solid var(--border);
+  border-radius: 10px; padding: 10px 12px;
+  transition: all 0.15s;
+}
+.task-row.active { background: #fff; border-color: var(--accent); box-shadow: 0 2px 8px rgba(37,99,235,0.1); }
+.task-row.active.cat-g { border-color: var(--green); box-shadow: 0 2px 8px rgba(22,163,74,0.1); }
+.task-row.active.cat-o { border-color: var(--orange); box-shadow: 0 2px 8px rgba(234,88,12,0.1); }
+.task-row.active.cat-p { border-color: var(--purple); box-shadow: 0 2px 8px rgba(124,58,237,0.1); }
+.task-row.active.cat-c { border-color: var(--cyan); box-shadow: 0 2px 8px rgba(8,145,178,0.1); }
+.task-row.active.cat-r { border-color: var(--red); box-shadow: 0 2px 8px rgba(220,38,38,0.1); }
+.task-row.active.cat-y { border-color: var(--yellow); box-shadow: 0 2px 8px rgba(217,119,6,0.1); }
+
+.task-name { font-size: 14px; color: var(--text); line-height: 1.3; font-weight: 500; }
+.cnt-val { font-family: 'JetBrains Mono', monospace; font-size: 18px; font-weight: 700; min-width: 24px; text-align: center; color: var(--text-dim); transition: color 0.15s; }
+.cnt-val.nonzero { color: var(--accent); }
+.task-row.active.cat-g .cnt-val.nonzero { color: var(--green); }
+.task-row.active.cat-o .cnt-val.nonzero { color: var(--orange); }
+.task-row.active.cat-p .cnt-val.nonzero { color: var(--purple); }
+.task-row.active.cat-c .cnt-val.nonzero { color: var(--cyan); }
+.task-row.active.cat-r .cnt-val.nonzero { color: var(--red); }
+.task-row.active.cat-y .cnt-val.nonzero { color: var(--yellow); }
+
+/* ===== SLOT COUNTERS ===== */
+.slot-counters { display: grid; grid-template-columns: repeat(3,1fr); gap: 6px; }
+.slot-counter { background: var(--surface2); border: 1.5px solid var(--border); border-radius: 9px; padding: 8px 5px; transition: all 0.15s; }
+.slot-counter.active { background: #fff; border-color: var(--accent); box-shadow: 0 1px 4px rgba(37,99,235,0.1); }
+.slot-label { font-size: 10px; color: var(--text-muted); text-align: center; margin-bottom: 5px; font-weight: 700; letter-spacing: 0.04em; }
+.slot-counter.active .slot-label { color: var(--accent); }
+.slot-controls { display: flex; align-items: center; justify-content: center; gap: 5px; }
+.slot-btn { width: 30px; height: 30px; border-radius: 7px; border: 1.5px solid var(--border); background: #fff; color: var(--text); font-size: 16px; line-height: 1; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.12s; flex-shrink: 0; padding: 0; font-weight: 700; }
+.slot-btn:active { transform: scale(0.88); }
+.slot-btn.plus { border-color: var(--accent); color: var(--accent); }
+.slot-btn.plus:active { background: var(--accent); color: #fff; }
+.slot-btn.minus { border-color: var(--red); color: var(--red); }
+.slot-btn.minus:active { background: var(--red); color: #fff; }
+.slot-val { font-family: 'JetBrains Mono', monospace; font-size: 18px; font-weight: 800; min-width: 24px; text-align: center; color: var(--text-dim); }
+.slot-counter.active .slot-val { color: var(--accent); }
+
+/* ===== よく使う ===== */
+.fav-section { background: linear-gradient(135deg, #eff6ff, #f0fdf4); border: 1.5px solid var(--border); border-radius: var(--radius); padding: 14px; margin-bottom: 10px; }
+.fav-title { font-size: 11px; color: var(--accent); font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 10px; display: flex; align-items: center; gap: 6px; }
+
+/* ===== 検索 ===== */
+.search-bar { position: relative; margin-bottom: 10px; }
+.search-bar input { padding-left: 36px; background: #fff; }
+.search-bar::before { content: '🔍'; position: absolute; left: 11px; top: 50%; transform: translateY(-50%); font-size: 14px; z-index: 1; }
+.search-bar .clear-x { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); background: none; border: none; color: var(--text-dim); cursor: pointer; font-size: 18px; padding: 4px; display: none; }
+.search-bar.has-text .clear-x { display: block; }
+
+/* ===== 前回コピー ===== */
+.copy-prev-btn { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; padding: 11px; background: var(--purple-dim); border: 1.5px dashed var(--purple); border-radius: 10px; color: var(--purple); font-family: 'Noto Sans JP', sans-serif; font-size: 13px; font-weight: 700; cursor: pointer; transition: all 0.2s; margin-bottom: 10px; }
+.copy-prev-btn:hover { background: #f5f3ff; border-style: solid; }
+
+/* ===== FREE TASKS ===== */
+.free-row { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
+.free-row input { flex: 1; }
+.free-cnt { width: 70px; flex-shrink: 0; }
+.rm-btn { background: none; border: none; color: var(--text-dim); font-size: 20px; cursor: pointer; padding: 4px 8px; border-radius: 6px; transition: color 0.2s; }
+.rm-btn:hover { color: var(--red); }
+.add-btn { background: none; border: 1.5px dashed var(--border); border-radius: 9px; color: var(--text-muted); font-family: 'Noto Sans JP', sans-serif; font-size: 13px; font-weight: 600; padding: 11px; cursor: pointer; width: 100%; transition: all 0.2s; margin-top: 2px; }
+.add-btn:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-dim); }
+
+/* ===== PROGRESS ===== */
+.prog-bar { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; padding: 9px 12px; background: #fff; border-radius: 9px; border: 1.5px solid var(--border); box-shadow: 0 1px 3px rgba(0,0,0,0.04); }
+.prog-track { flex: 1; height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; }
+.prog-fill { height: 100%; background: linear-gradient(90deg, var(--accent), var(--green)); border-radius: 3px; transition: width 0.4s ease; }
+.prog-txt { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--text-muted); font-weight: 700; flex-shrink: 0; }
+
+/* ===== SAVE BTN ===== */
+.save-btn { width: 100%; padding: 16px; background: var(--accent); border: none; border-radius: var(--radius); color: #fff; font-family: 'Noto Sans JP', sans-serif; font-size: 15px; font-weight: 800; cursor: pointer; transition: all 0.2s; margin-top: 4px; box-shadow: 0 4px 12px rgba(37,99,235,0.3); letter-spacing: 0.05em; }
+.save-btn:hover { background: #1d4ed8; box-shadow: 0 6px 16px rgba(37,99,235,0.4); }
+.save-btn:active { transform: scale(0.98); }
+
+/* ===== HISTORY ===== */
+.month-nav { display: flex; align-items: center; justify-content: space-between; background: #fff; border: 1.5px solid var(--border); border-radius: var(--radius); padding: 10px 16px; margin-bottom: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.04); }
+.month-nav button { background: none; border: none; color: var(--text-muted); font-size: 22px; cursor: pointer; padding: 2px 12px; border-radius: 6px; transition: all 0.2s; }
+.month-nav button:hover { color: var(--accent); background: var(--accent-dim); }
+.month-nav span { font-family: 'JetBrains Mono', monospace; font-size: 15px; font-weight: 700; color: var(--text); }
+.top-actions { display: flex; gap: 8px; margin-bottom: 10px; }
+.outline-btn { flex: 1; background: #fff; border: 1.5px solid var(--border); border-radius: 8px; color: var(--text-muted); font-family: 'Noto Sans JP', sans-serif; font-size: 12px; font-weight: 600; padding: 9px 6px; cursor: pointer; transition: all 0.2s; }
+.outline-btn:hover { border-color: var(--green); color: var(--green); background: var(--green-dim); }
+.outline-btn.blue:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-dim); }
+
+.rec-card { background: #fff; border: 1.5px solid var(--border); border-radius: var(--radius); padding: 13px 15px; margin-bottom: 8px; cursor: pointer; transition: all 0.2s; box-shadow: 0 1px 3px rgba(0,0,0,0.04); }
+.rec-card:hover { border-color: var(--accent); box-shadow: 0 3px 10px rgba(37,99,235,0.1); }
+.rc-hd { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 9px; }
+.rc-date { font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 700; color: var(--accent); }
+.rc-staff { font-size: 11px; color: var(--text-muted); margin-top: 3px; }
+.rc-right { display: flex; align-items: center; gap: 6px; }
+.rc-total { font-size: 11px; color: var(--text-muted); background: var(--surface2); border: 1px solid var(--border); border-radius: 20px; padding: 2px 9px; font-weight: 600; }
+.del-btn { background: none; border: none; color: var(--text-dim); cursor: pointer; font-size: 14px; padding: 4px 8px; border-radius: 6px; transition: all 0.2s; }
+.del-btn:hover { color: var(--red); background: var(--red-dim); }
+.task-chips { display: flex; flex-wrap: wrap; gap: 5px; }
+.chip { font-size: 11px; padding: 3px 9px; border-radius: 20px; background: var(--accent-dim); border: 1px solid rgba(37,99,235,0.2); color: var(--accent); font-weight: 600; }
+.chip-cnt { font-family: 'JetBrains Mono', monospace; font-weight: 800; }
+.rc-oncall { margin-top: 8px; font-size: 11px; display: flex; gap: 6px; flex-wrap: wrap; }
+.obadge { padding: 2px 8px; border-radius: 20px; font-weight: 700; font-size: 11px; }
+.obadge.yes { background: var(--orange-dim); color: var(--orange); border: 1px solid var(--orange); }
+.obadge.no { background: var(--surface2); color: var(--text-dim); border: 1px solid var(--border); }
+.rc-memo { margin-top: 8px; font-size: 12px; color: var(--text-muted); border-top: 1px solid var(--border2); padding-top: 8px; }
+
+/* ===== STATS ===== */
+.kpi-grid { display: grid; grid-template-columns: repeat(2,1fr); gap: 8px; margin-bottom: 10px; }
+.kpi-card { background: #fff; border: 1.5px solid var(--border); border-radius: var(--radius); padding: 14px 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.04); }
+.kpi-lbl { font-size: 11px; color: var(--text-muted); margin-bottom: 5px; font-weight: 600; }
+.kpi-val { font-family: 'JetBrains Mono', monospace; font-size: 26px; font-weight: 800; line-height: 1; }
+.kpi-sub { font-size: 11px; color: var(--text-muted); margin-top: 3px; }
+.bar-sec { background: #fff; border: 1.5px solid var(--border); border-radius: var(--radius); padding: 15px; margin-bottom: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.04); }
+.bar-sec h3 { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 12px; font-weight: 800; }
+.b-row { display: flex; align-items: center; gap: 9px; margin-bottom: 9px; }
+.b-lbl { font-size: 12px; color: var(--text); width: 160px; flex-shrink: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 500; }
+.b-track { flex: 1; background: var(--surface2); border-radius: 4px; height: 16px; overflow: hidden; }
+.b-fill { height: 100%; border-radius: 4px; background: var(--accent); transition: width 0.6s cubic-bezier(0.4,0,0.2,1); }
+.b-cnt { font-family: 'JetBrains Mono', monospace; font-size: 12px; font-weight: 700; color: var(--text); width: 30px; text-align: right; flex-shrink: 0; }
+.cal-sec { background: #fff; border: 1.5px solid var(--border); border-radius: var(--radius); padding: 15px; margin-bottom: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.04); }
+.cal-sec h3 { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 12px; font-weight: 800; }
+.cal-grid { display: grid; grid-template-columns: repeat(7,1fr); gap: 3px; }
+.cal-dh { font-size: 10px; color: var(--text-dim); text-align: center; padding: 3px 0 5px; font-weight: 700; }
+.cal-cell { aspect-ratio: 1; border-radius: 5px; background: var(--surface2); display: flex; align-items: center; justify-content: center; font-size: 11px; color: var(--text-dim); font-weight: 600; }
+.cal-cell.empty { background: transparent; }
+
+/* ===== EMPTY STATE ===== */
+.empty-state { text-align: center; padding: 60px 20px; color: var(--text-muted); }
+.empty-state .ei { font-size: 44px; margin-bottom: 12px; opacity: 0.4; }
+.empty-state p { font-size: 13px; line-height: 1.8; }
+
+/* ===== TOAST ===== */
+.toast { position: fixed; bottom: 88px; left: 50%; transform: translateX(-50%) translateY(60px); background: var(--green); color: #fff; font-size: 13px; font-weight: 700; padding: 10px 22px; border-radius: 30px; pointer-events: none; white-space: nowrap; z-index: 999; transition: transform 0.3s cubic-bezier(0.34,1.56,0.64,1), opacity 0.3s; opacity: 0; box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
+.toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+/* ===== 確認モーダル ===== */
+.modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 500; display: flex; align-items: center; justify-content: center; padding: 20px; opacity: 0; pointer-events: none; transition: opacity 0.2s; }
+.modal-overlay.show { opacity: 1; pointer-events: all; }
+.modal-box { background: #fff; border-radius: 18px; padding: 24px 20px; max-width: 340px; width: 100%; box-shadow: 0 20px 60px rgba(0,0,0,0.2); }
+.modal-icon { font-size: 36px; text-align: center; margin-bottom: 12px; }
+.modal-title { font-size: 17px; font-weight: 800; color: var(--text); text-align: center; margin-bottom: 6px; }
+.modal-body { font-size: 13px; color: var(--text-muted); text-align: center; line-height: 1.7; margin-bottom: 20px; }
+.modal-date { color: var(--red); font-weight: 700; }
+.modal-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.modal-btn { padding: 13px; border-radius: 10px; border: none; font-family: 'Noto Sans Jo', sans-serif; font-size: 14px; font-weight: 700; cursor: pointer; transition: all 0.15s; }
+.modal-btn.cancel { background: var(--surface2); color: var(--text-muted); border: 1.5px solid var(--border); }
+.modal-btn.cancel:hover { background: var(--border); }
+.modal-btn.danger { background: var(--red); color: #fff; box-shadow: 0 3px 8px rgba(220,38,38,0.3); }
+.modal-btn.danger:hover { background: #b91c1c; }
+
+/* ===== 分析インサイト ===== */
+.insight-card { background: #fff; border: 1.5px solid var(--border); border-radius: var(--radius); padding: 16px; margin-bottom: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.04); }
+.insight-card .ic-title { font-size: 11px; font-weight: 800; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 14px; }
+.insight-list { display: flex; flex-direction: column; gap: 8px; }
+.insight-item { background: var(--surface2); border-radius: 9px; padding: 12px 14px; border-left: 4px solid var(--accent); }
+.insight-item.warn { border-left-color: var(--orange); }
+.insight-item.good { border-left-color: var(--green); }
+.insight-item.alert { border-left-color: var(--red); }
+.ii-label { font-size: 13px; font-weight: 700; color: var(--text); margin-bottom: 5px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.ii-body { font-size: 12px; color: var(--text-muted); line-height: 1.7; }
+.ii-suggest { font-size: 11px; color: var(--accent); margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border); line-height: 1.6; font-weight: 600; }
+.insight-item.warn .ii-suggest { color: var(--orange); }
+.insight-item.good .ii-suggest { color: var(--green); }
+.insight-item.alert .ii-suggest { color: var(--red); }
+
+/* ===== デルタバッジ ===== */
+.delta-up { display: inline-flex; align-items: center; gap: 2px; font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 700; padding: 2px 7px; border-radius: 20px; background: var(--red-dim); color: var(--red); }
+.delta-down { display: inline-flex; align-items: center; gap: 2px; font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 700; padding: 2px 7px; border-radius: 20px; background: var(--green-dim); color: var(--green); }
+.delta-flat { display: inline-flex; align-items: center; font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 700; padding: 2px 7px; border-radius: 20px; background: var(--surface2); color: var(--text-muted); }
+
+/* ===== 同期バッジ ===== */
+.sync-badge { display: inline-flex; align-items: center; gap: 3px; font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 20px; margin-left: 6px; }
+.sync-done { background: var(--green-dim); color: var(--green); border: 1px solid var(--green); }
+.sync-pending { background: var(--orange-dim); color: var(--orange); border: 1px solid var(--orange); }
+.sync-error { background: var(--red-dim); color: var(--red); border: 1px solid var(--red); }
+
+/* ===== 設定 ===== */
+.settings-card { background: #fff; border: 1.5px solid var(--border); border-radius: var(--radius); padding: 16px; margin-bottom: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.04); }
+.settings-card h3 { font-size: 12px; font-weight: 800; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 12px; }
+.settings-row { margin-bottom: 12px; }
+.settings-row:last-child { margin-bottom: 0; }
+.settings-help { font-size: 11px; color: var(--text-muted); line-height: 1.6; margin-top: 6px; }
+.settings-status { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 700; }
+.status-on { background: var(--green-dim); color: var(--green); border: 1px solid var(--green); }
+.status-off { background: var(--surface2); color: var(--text-dim); border: 1px solid var(--border); }
+.sync-btn { background: var(--green); border: none; border-radius: 10px; color: #fff; font-family: 'Noto Sans JP', sans-serif; font-size: 13px; font-weight: 700; padding: 11px 14px; cursor: pointer; transition: all 0.2s; width: 100%; display: flex; align-items: center; justify-content: center; gap: 6px; box-shadow: 0 3px 8px rgba(22,163,74,0.2); }
+.sync-btn:hover { background: #15803d; transform: translateY(-1px); }
+.sync-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; box-shadow: none; }
+.sync-btn.resync { background: #fff; color: var(--text); border: 1.5px solid var(--border); box-shadow: none; }
+.sync-btn.resync:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-dim); }
+@keyframes spin { to { transform: rotate(360deg); } }
+.spinning { display: inline-block; animation: spin 1s linear infinite; }
+
+/* ===== 入力チェック ===== */
+.check-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
+.check-item { display: flex; align-items: center; gap: 8px; padding: 9px 12px; border-radius: 8px; font-size: 13px; font-weight: 600; }
+.check-item.ok { background: var(--green-dim); color: var(--green); border: 1px solid rgba(22,163,74,0.2); }
+.check-item.ng { background: var(--orange-dim); color: var(--orange); border: 1px solid rgba(234,88,12,0.25); }
+.check-icon { font-size: 14px; flex-shrink: 0; }
+
+/* ===== 年次集計 ===== */
+.year-nav { display: flex; align-items: center; justify-content: space-between; background: #fff; border: 1.5px solid var(--border); border-radius: var(--radius); padding: 10px 16px; margin-bottom: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.04); }
+.year-nav button { background: none; border: none; color: var(--text-muted); font-size: 22px; cursor: pointer; padding: 2px 12px; border-radius: 6px; transition: all 0.2s; }
+.year-nav button:hover { color: var(--accent); background: var(--accent-dim); }
+.year-nav span { font-family: 'JetBrains Mono', monospace; font-size: 15px; font-weight: 700; color: var(--text); }
+.year-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 8px; margin-bottom: 10px; }
+.month-card { background: #fff; border: 1.5px solid var(--border); border-radius: 10px; padding: 12px 10px; text-align: center; cursor: pointer; transition: all 0.2s; box-shadow: 0 1px 3px rgba(0,0,0,0.04); }
+.month-card:hover { border-color: var(--accent); box-shadow: 0 3px 10px rgba(37,99,235,0.1); transform: translateY(-1px); }
+.month-card.empty { opacity: 0.4; cursor: default; }
+.month-card.empty:hover { transform: none; border-color: var(--border); box-shadow: none; }
+.month-card .mc-month { font-size: 12px; color: var(--text-muted); margin-bottom: 4px; font-weight: 700; }
+.month-card .mc-nights { font-family: 'JetBrains Mono', monospace; font-size: 22px; font-weight: 800; color: var(--accent); line-height: 1; }
+.month-card .mc-tasks { font-size: 11px; color: var(--text-muted); margin-top: 3px; }
+.month-card.empty .mc-nights { color: var(--text-dim); font-size: 14px; }
+.year-summary { background: #fff; border: 1.5px solid var(--border); border-radius: var(--radius); padding: 16px; margin-bottom: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.04); }
+.year-summary h3 { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 14px; font-weight: 800; }
+.ys-grid { display: grid; grid-template-columns: repeat(2,1fr); gap: 8px; }
+.ys-item { background: var(--surface2); border-radius: 8px; padding: 12px; }
+.ys-label { font-size: 11px; color: var(--text-muted); margin-bottom: 4px; font-weight: 600; }
+.ys-value { font-family: 'JetBrains Mono', monospace; font-size: 22px; font-weight: 800; line-height: 1; }
+.ys-sub { font-size: 10px; color: var(--text-dim); margin-top: 3px; }
+
+/* ===== 上申資料 ===== */
+.report-section { background: #fff; border: 1.5px solid var(--border); border-radius: var(--radius); padding: 16px; margin-bottom: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.04); }
+.report-section h3 { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 14px; font-weight: 800; }
+.report-preview { background: var(--surface2); border: 1.5px solid var(--border); border-radius: 9px; padding: 14px; margin-bottom: 12px; font-size: 12px; line-height: 1.9; color: var(--text-muted); white-space: pre-wrap; max-height: 320px; overflow-y: auto; font-family: 'Noto Sans JP', sans-serif; }
+.copy-report-btn { width: 100%; padding: 12px; background: var(--surface2); border: 1.5px solid var(--border); border-radius: 10px; color: var(--text-muted); font-family: 'Noto Sans JP', sans-serif; font-size: 13px; font-weight: 700; cursor: pointer; transition: all 0.2s; }
+.copy-report-btn:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-dim); }
+
+/* ===== グラフ ===== */
+.chart-sec { background: #fff; border: 1.5px solid var(--border); border-radius: var(--radius); padding: 16px; margin-bottom: 10px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.04); }
+.chart-sec h3 { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 12px; font-weight: 800; }
+.line-chart { width: 100%; height: 200px; }
+
+/* ===== オンコール外呼び出し者パネル ===== */
+.ext-caller-panel {
+  display: none;
+  margin-top: 10px;
+  padding: 12px;
+  background: var(--orange-dim);
+  border: 1.5px solid var(--orange);
+  border-radius: 10px;
+  animation: fadeIn 0.2s ease;
+}
+.ext-caller-panel.show { display: block; }
+@keyframes fadeIn { from { opacity:0; transform:translateY(-4px); } to { opacity:1; transform:translateY(0); } }
+
+.panel-label {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  margin-bottom: 9px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.panel-label.orange { color: var(--orange); }
+.panel-label.red { color: var(--red); }
+
+/* ===== オンコールグリッド2カラム ===== */
+.oncall-2col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.oncall-box {
+  background: var(--surface2);
+  border: 1.5px solid var(--border);
+  border-radius: 10px;
+  padding: 12px;
+}
+.oncall-box.orange-box { border-color: var(--orange); background: rgba(234,88,12,0.04); }
+.oncall-box.red-box { border-color: var(--red); background: rgba(220,38,38,0.04); }
+.oncall-box-title {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  margin-bottom: 9px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.oncall-box-title.orange { color: var(--orange); }
+.oncall-box-title.red { color: var(--red); }
+
+/* ===== スマホ ===== */
+@media (max-width: 480px) { .task-name { font-size: 14px; } .oncall-2col { grid-template-columns: 1fr; } }
+
+</style>
+</head>
+<body>
+<header class="app-header">
+  <span class="app-logo">CE</span>
+  <div class="app-title">夜勤業務集計</div>
+</header>
+<div class="tab-bar">
+  <button class="tab-btn active" onclick="showTab('input')"><span class="ti">📋</span>入力</button>
+  <button class="tab-btn" onclick="showTab('history')"><span class="ti">📁</span>履歴</button>
+  <button class="tab-btn" onclick="showTab('stats')"><span class="ti">📊</span>月次</button>
+  <button class="tab-btn" onclick="showTab('annual')"><span class="ti">📅</span>年次</button>
+  <button class="tab-btn" onclick="showTab('settings')"><span class="ti">⚙️</span>設定</button>
+</div>
+
+<!-- ===== INPUT ===== -->
+<div class="page active" id="page-input">
+  <div class="prog-bar">
+    <span style="font-size:12px;color:var(--text-muted);flex-shrink:0">入力進捗</span>
+    <div class="prog-track"><div class="prog-fill" id="prog-fill" style="width:0%"></div></div>
+    <span class="prog-txt" id="prog-txt">0 / 5</span>
+  </div>
+
+  <!-- 夜勤情報 -->
+  <div class="card">
+    <div class="card-hdr c-blue">夜勤情報</div>
+    <div class="field-label">夜勤日付</div>
+    <input type="date" id="shift-date" style="margin-bottom:0">
+  </div>
+
+  <!-- 夜勤者 -->
+  <div class="card">
+    <div class="card-hdr c-green">夜勤者（複数選択可）</div>
+    <div class="staff-grid" id="staff-grid"></div>
+  </div>
+
+  <!-- オンコール -->
+  <div class="card">
+    <div class="card-hdr c-orange">オンコール / 心外オンコール</div>
+
+    <!-- 2カラムレイアウト：左=通常オンコール、右=心外オンコール -->
+    <div class="oncall-2col">
+
+      <!-- 左：通常オンコール -->
+      <div class="oncall-box orange-box">
+        <div class="oncall-box-title orange">🔔 オンコール</div>
+        <div class="field-label" style="margin-bottom:6px;font-size:11px">担当者</div>
+        <div class="staff-grid" id="oncall-grid"></div>
+
+        <div style="margin-top:11px">
+          <div class="field-label" style="margin-bottom:6px;font-size:11px">呼び出し</div>
+          <div class="toggle-row">
+            <button class="tgl-btn" id="oc-call-yes" onclick="toggleOC('call','yes')" style="font-size:12px;padding:9px">✓ あり</button>
+            <button class="tgl-btn" id="oc-call-no" onclick="toggleOC('call','no')" style="font-size:12px;padding:9px">✗ なし</button>
+          </div>
+        </div>
+
+        <div style="margin-top:10px">
+          <div class="field-label" style="margin-bottom:6px;font-size:11px">オンコール外呼び出し</div>
+          <div class="toggle-row">
+            <button class="tgl-btn" id="oc-ext-yes" onclick="toggleOC('ext','yes')" style="font-size:12px;padding:9px">✓ あり</button>
+            <button class="tgl-btn" id="oc-ext-no" onclick="toggleOC('ext','no')" style="font-size:12px;padding:9px">✗ なし</button>
+          </div>
+          <!-- オンコール外呼び出しあり時：誰が呼ばれたか -->
+          <div class="ext-caller-panel" id="ext-caller-panel">
+            <div class="panel-label orange">📞 呼ばれたスタッフ（複数選択可）</div>
+            <div class="staff-grid" id="ext-caller-grid" style="gap:5px"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 右：心外オンコール -->
+      <div class="oncall-box red-box">
+        <div class="oncall-box-title red">🫀 心外オンコール</div>
+        <div class="field-label" style="margin-bottom:6px;font-size:11px">担当者</div>
+        <div class="staff-grid" id="cardiac-oncall-grid"></div>
+
+        <div style="margin-top:11px">
+          <div class="field-label" style="margin-bottom:6px;font-size:11px">呼び出し</div>
+          <div class="toggle-row">
+            <button class="tgl-btn" id="oc-cardiac-yes" onclick="toggleOC('cardiac','yes')" style="font-size:12px;padding:9px">✓ あり</button>
+            <button class="tgl-btn" id="oc-cardiac-no" onclick="toggleOC('cardiac','no')" style="font-size:12px;padding:9px">✗ なし</button>
+          </div>
+        </div>
+
+
+      </div>
+
+    </div><!-- /.oncall-2col -->
+  </div>
+
+  <!-- 業務内容 -->
+  <div class="card">
+    <div class="card-hdr c-purple">業務内容（件数を入力）</div>
+
+    <!-- 前回コピー -->
+    <button class="copy-prev-btn" id="copy-prev-btn" onclick="copyPrevious()">📋 前回の夜勤をコピーして編集</button>
+
+    <!-- 検索バー -->
+    <div class="search-bar" id="task-search-wrap">
+      <input type="text" id="task-search" placeholder="業務名で検索..." oninput="filterTasks(this.value)">
+      <button class="clear-x" onclick="clearSearch()">×</button>
+    </div>
+
+    <!-- よく使う業務（自動表示） -->
+    <div id="fav-tasks-section"></div>
+
+    <!-- 全業務リスト -->
+    <div id="task-container"></div>
+  </div>
+
+  <!-- 自由入力 -->
+  <div class="card">
+    <div class="card-hdr c-yellow">その他・自由記載</div>
+    <div id="free-container"></div>
+    <button class="add-btn" onclick="addFree()">＋ 業務を追加</button>
+  </div>
+
+  <!-- メモ -->
+  <div class="card">
+    <div class="card-hdr c-cyan">引き継ぎ・特記事項</div>
+    <textarea id="shift-memo" placeholder="特記事項・引き継ぎ・イレギュラー対応など"></textarea>
+  </div>
+
+  <div id="save-check-list"></div>
+  <button class="save-btn" onclick="checkAndSave()">✓ この夜勤を保存する</button>
+</div>
+
+<!-- ===== HISTORY ===== -->
+<div class="page" id="page-history">
+  <div class="month-nav">
+    <button onclick="changeMonth('h',-1)">‹</button>
+    <span id="h-month-lbl"></span>
+    <button onclick="changeMonth('h',1)">›</button>
+  </div>
+  <div class="top-actions">
+    <button class="outline-btn" onclick="exportXLSX('month')">↓ Excel月次</button>
+    <button class="outline-btn blue" onclick="exportXLSX('all')">↓ Excel全期間</button>
+  </div>
+  <div class="top-actions">
+    <button class="outline-btn" onclick="exportJSON()">💾 バックアップ</button>
+    <button class="outline-btn blue" onclick="document.getElementById('restore-input').click()">📥 復元</button>
+    <input type="file" id="restore-input" accept=".json" style="display:none" onchange="importJSON(event)">
+  </div>
+  <div id="history-list"></div>
+</div>
+
+<!-- ===== STATS ===== -->
+<div class="page" id="page-stats">
+  <div class="month-nav">
+    <button onclick="changeMonth('s',-1)">‹</button>
+    <span id="s-month-lbl"></span>
+    <button onclick="changeMonth('s',1)">›</button>
+  </div>
+  <div class="top-actions">
+    <button class="outline-btn" id="stats-view-btn" onclick="switchStatsView('stats')" style="border-color:var(--accent);color:var(--accent)">📊 集計</button>
+    <button class="outline-btn" id="insight-view-btn" onclick="switchStatsView('insight')">💡 分析</button>
+    <button class="outline-btn" id="report-view-btn" onclick="switchStatsView('report')">📄 上申資料</button>
+    <button class="outline-btn" onclick="exportXLSX('stats')">↓ Excel</button>
+  </div>
+  <div id="stats-content"></div>
+  <div id="insight-content" style="display:none"></div>
+  <div id="report-content" style="display:none"></div>
+</div>
+
+<!-- ===== ANNUAL ===== -->
+<div class="page" id="page-annual">
+  <div class="year-nav">
+    <button onclick="changeYear(-1)">‹</button>
+    <span id="annual-year-lbl"></span>
+    <button onclick="changeYear(1)">›</button>
+  </div>
+  <div class="top-actions">
+    <button class="outline-btn" onclick="exportXLSX('annual')">↓ 年次Excel出力</button>
+  </div>
+  <div id="annual-content"></div>
+</div>
+
+<!-- ===== SETTINGS ===== -->
+<div class="page" id="page-settings">
+  <div class="settings-card">
+    <h3>☁️ Googleスプレッドシート連携</h3>
+    <div class="settings-row">
+      <div class="field-label">接続状態</div>
+      <span class="settings-status" id="sync-status">読み込み中...</span>
+    </div>
+    <div class="settings-row">
+      <div class="field-label">Apps Script URL</div>
+      <input type="text" id="gas-url" placeholder="https://script.google.com/macros/s/.../exec" oninput="saveGasUrl()">
+      <div class="settings-help">
+        スプレッドシートで作成したApps ScriptのデプロイURL（ウェブアプリURL）を貼り付けてください。
+      </div>
+    </div>
+    <div class="settings-row">
+      <button class="sync-btn" id="test-connection-btn" onclick="testConnection()">🔗 接続テスト</button>
+    </div>
+    <div class="settings-row">
+      <button class="sync-btn" id="sync-all-btn" onclick="syncAll()">🔄 未送信データをまとめて送信</button>
+      <div class="settings-help" id="sync-summary" style="margin-top:8px"></div>
+    </div>
+    <div class="settings-row">
+      <button class="sync-btn resync" id="restore-sheet-btn" onclick="restoreFromSheet()">☁️ スプレッドシートからアプリに復元</button>
+      <div class="settings-help" style="margin-top:6px">
+        ⚠️ iPhoneを機種変更・初期化した後や、アプリのデータが消えたときに使います。スプレッドシートの全データをアプリに読み込み直します。既存のローカルデータとマージされます（重複は新しい方優先）。
+      </div>
+    </div>
+  </div>
+
+  <div class="settings-card">
+    <h3>📖 設定方法（はじめての方）</h3>
+    <div class="settings-help" style="line-height:1.9">
+      スプレッドシート連携を使うには、一度だけ初期設定が必要です。<br><br>
+      <strong style="color:var(--accent)">手順の概要：</strong><br>
+      ① Googleスプレッドシートを新規作成<br>
+      ② スクリプトエディタを開いてコードを貼り付け<br>
+      ③ ウェブアプリとしてデプロイしてURLを取得<br>
+      ④ そのURLを上の欄に貼り付け<br><br>
+      <strong style="color:var(--orange)">詳しい手順書は Claude との会話を参照してください。</strong>
+    </div>
+  </div>
+
+  <div class="settings-card">
+    <h3>💾 データ管理</h3>
+    <div class="settings-row">
+      <div class="field-label">ローカル記録数</div>
+      <div id="local-count" style="font-family:'JetBrains Mono',monospace;font-size:18px;color:var(--accent);font-weight:700"></div>
+    </div>
+    <div class="bk-btns">
+      <button class="outline-btn" onclick="exportJSON()">💾 バックアップ</button>
+      <button class="outline-btn blue" onclick="document.getElementById('restore-input2').click()">📥 復元</button>
+      <input type="file" id="restore-input2" accept=".json" style="display:none" onchange="importJSON(event)">
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<!-- 削除確認ダイアログ -->
+<div class="modal-overlay" id="del-modal">
+  <div class="modal-box">
+    <div class="modal-icon">🗑️</div>
+    <div class="modal-title">記録を削除しますか？</div>
+    <div class="modal-body">
+      <span class="modal-date" id="modal-date-lbl"></span><br>
+      の記録を削除します。<br>この操作は元に戻せません。
+    </div>
+    <div class="modal-btns">
+      <button class="modal-btn cancel" onclick="closeDelModal()">キャンセル</button>
+      <button class="modal-btn danger" onclick="confirmDelete()">削除する</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ===================== DATA =====================
+const STAFF = [
+  '伊藤','本間（俊）','矢島','野口','原尻',
+  '島田','宍戸','本間（成）','伊藤（大）','川原','西川','内山',
+  '相馬','山田（麻）','鈴木','佐藤（亜）','川崎','山田（裕）',
+  '小川','杉山','笹岡','宮本','佐藤（友）','角田',
+  '高澤','小澤','安田','林','海野','有本'
+];
+
+const TASK_GROUPS = [
+  { id:'catheter', label:'緊急カテーテル', cat:'r', tasks:[
+    '緊急カテーテル（CAG）','緊急カテーテル（PCI）','緊急カテーテル（EVT）',
+    '心筋生検','心嚢穿刺'
+  ]},
+  { id:'pace', label:'ペースメーカー関連', cat:'o', tasks:[
+    '体外式ペースメーカー挿入','体外式ペースメーカートラブル対応','ペースメーカーチェック対応'
+  ]},
+  { id:'chdf', label:'CHDF', cat:'b', tasks:[
+    'CHDF開始（成人）','CHDF定時チェック（成人）','CHDFトラブル対応（成人）',
+    'CHDF回路交換（成人）','CHDF終了（成人）',
+    'CHDF開始（小児）','CHDF定時チェック（小児）','CHDFトラブル対応（小児）',
+    'CHDF回路交換（小児）','CHDF終了（小児）'
+  ]},
+  { id:'dialysis', label:'透析・血液浄化（HD/PE/PMX等）', cat:'p', tasks:[
+    'HD','PE','PMX','活性炭吸着'
+  ]},
+  { id:'hypo', label:'低体温療法', cat:'c', tasks:[
+    '低体温療法（アークティックサン）','低体温療法（メディサーム）','低体温療法（サーモガード）'
+  ]},
+  { id:'monitor', label:'モニタリング・循環補助', cat:'g', tasks:[
+    'BIS','ICP','心臓外科帰室対応',
+    'ヘモスフィア（スワンガンツ）','ヘモスフィア（フロートラック）','ヘモスフィア（SvO2）','ビジレオ',
+    '経肺圧モニター対応'
+  ]},
+  { id:'ecmo_va', label:'V-A ECMO', cat:'r', tasks:[
+    'V-A ECMO開始（成人）','V-A ECMO定時チェック（成人）','V-A ECMOトラブル対応（成人）','V-A ECMO終了（成人）',
+    'V-A ECMO開始（小児）','V-A ECMO定時チェック（小児）','V-A ECMOトラブル対応（小児）','V-A ECMO終了（小児）'
+  ]},
+  { id:'ecmo_vv', label:'V-V ECMO', cat:'o', tasks:[
+    'V-V ECMO開始（成人）','V-V ECMO定時チェック（成人）','V-V ECMOトラブル対応（成人）','V-V ECMO終了（成人）',
+    'V-V ECMO開始（小児）','V-V ECMO定時チェック（小児）','V-V ECMOトラブル対応（小児）','V-V ECMO終了（小児）'
+  ]},
+  { id:'iabp', label:'IABP / Impella', cat:'p', tasks:[
+    'IABP開始','IABP終了','IABPトラブル対応',
+    'Impella CP導入','Impella 5.5導入','Impella終了','Impellaトラブル対応',
+    '補助循環搬送対応'
+  ]},
+  { id:'intub', label:'IPPV・NPPV・酸素療法・その他呼吸関連', cat:'c', tasks:[
+    '挿管対応（成人）','挿管対応（小児）','挿管対応（新生児）',
+    'NPPV導入（成人）','NPPVトラブル対応（成人）',
+    'NPPV導入（小児）','NPPVトラブル対応（小児）',
+    'HFNC導入（成人）','HFNCトラブル対応（成人）',
+    'HFNC導入（小児）','HFNCトラブル対応（小児）',
+    'HFNC導入（新生児）','HFNCトラブル対応（新生児）',
+    'SiPAP導入','CNO導入',
+    'CPAP機対応',
+    '人工呼吸器トラブル対応（PB980）','人工呼吸器トラブル対応（V500）',
+    '人工呼吸器トラブル対応（Savina300）','人工呼吸器トラブル対応（Monnal T60）',
+    '人工呼吸器トラブル対応（VN800/VN500）','人工呼吸器トラブル対応（Vivo45）',
+    '人工呼吸器トラブル対応（Torilogy）','人工呼吸器トラブル対応（NKV）',
+    '人工呼吸器トラブル対応（その他）',
+    '加温加湿器対応','ネブライザ対応（全病棟）','パラパック対応',
+    '自動カフ圧計対応',
+    '呼吸器転棟・移動対応'
+  ]},
+  { id:'no', label:'NO療法', cat:'g', tasks:[
+    'NO導入（成人）','NOトラブル対応（成人）',
+    'NO導入（小児）','NOトラブル対応（小児）',
+    'NO導入（新生児）','NOトラブル対応（新生児）'
+  ]},
+  { id:'resp_misc', label:'保育器・モニター', cat:'y', tasks:[
+    '保育器対応',
+    'Philipsモニター対応（セントラルモニター含む）',
+    '日本光電モニター対応（セントラルモニター含む）',
+    'その他モニター対応（セントラルモニター含む）'
+  ]},
+  { id:'emg', label:'緊急対応・手術', cat:'r', tasks:[
+    'コード・ブルー','コード・ピンク','外傷コール（システム1000対応）','外傷コール（対応なし）',
+    'ME業務機器対応（その他欄に記載）',
+    '緊急心臓外科手術（TEVAR含む）','緊急TAVI（BAV含む）',
+    '麻酔器対応','OPE機器対応（その他欄に記載）',
+    'セルセーバー（エクストラ）','多職種カンファレンス'
+  ]},
+  { id:'other', label:'その他', cat:'y', tasks:[
+    '災害対応','業務対応なし'
+  ]}
+];
+
+// ===================== STATE =====================
+// 心外オンコールメンバー
+const CARDIAC_ONCALL_STAFF = ['伊藤','佐藤（友）','本間（俊）','矢島','小澤','安田','林'];
+
+let selStaff = new Set();
+let selOncall = new Set();
+let selCardiacOncall = new Set();
+let ocCall = null, ocExt = null, ocCardiac = null;
+let selExtCallers = new Set();       // オンコール外呼び出し：呼ばれたスタッフ
+let taskCounts = {}; // taskName -> total count
+let taskSlots = {};  // taskName -> {early, mid, late} 時間帯別
+let freeTasks = [];
+let hMonth = new Date();
+let sMonth = new Date();
+let collapsedGroups = new Set(); // 折りたたみ状態
+let searchQuery = '';
+
+// 時間帯定義（16:30〜翌9:00を均等3分割）
+const TIME_SLOTS = [
+  { key:'early', label:'準夜 (16:30-22:00)',   short:'準夜' },
+  { key:'mid',   label:'深夜 (22:00-翌3:30)',  short:'深夜' },
+  { key:'late',  label:'早朝 (翌3:30-9:00)',   short:'早朝' }
+];
+
+window.onload = () => {
+  document.getElementById('shift-date').value = getNextDate();
+  collapsedGroups = new Set(TASK_GROUPS.map(g=>g.id));
+  renderStaff();
+  renderOncall();
+  renderCardiacOncall();
+  renderExtCallerGrid();
+  renderFavTasks();
+  renderTasks();
+  updatePrevCopyButton();
+  updateProg();
+  updateLabels();
+};
+
+// 最後の記録の翌日を返す（未来になる場合は今日）
+function getNextDate(fromDate) {
+  const today = new Date().toISOString().slice(0,10);
+  if (fromDate) {
+    const next = new Date(fromDate + 'T00:00:00');
+    next.setDate(next.getDate() + 1);
+    const nextStr = next.toISOString().slice(0,10);
+    return nextStr > today ? today : nextStr;
+  }
+  const recs = getRecords();
+  if (!recs.length) return today;
+  const last = recs.sort((a,b)=>b.date.localeCompare(a.date))[0].date;
+  const next = new Date(last + 'T00:00:00');
+  next.setDate(next.getDate() + 1);
+  const nextStr = next.toISOString().slice(0,10);
+  return nextStr > today ? today : nextStr;
+}
+function renderStaff() {
+  const g = document.getElementById('staff-grid');
+  g.innerHTML = '';
+  STAFF.forEach(n => {
+    const el = document.createElement('div');
+    el.className = 's-chip' + (selStaff.has(n) ? ' sel' : '');
+    el.textContent = n;
+    el.onclick = () => { selStaff.has(n) ? selStaff.delete(n) : selStaff.add(n); el.classList.toggle('sel'); updateProg(); };
+    g.appendChild(el);
+  });
+}
+function renderOncall() {
+  const g = document.getElementById('oncall-grid');
+  g.innerHTML = '';
+  STAFF.forEach(n => {
+    const el = document.createElement('div');
+    el.className = 's-chip' + (selOncall.has(n) ? ' sel-g' : '');
+    el.textContent = n;
+    el.onclick = () => { selOncall.has(n) ? selOncall.delete(n) : selOncall.add(n); el.classList.toggle('sel-g'); };
+    g.appendChild(el);
+  });
+}
+
+function renderCardiacOncall() {
+  const g = document.getElementById('cardiac-oncall-grid');
+  g.innerHTML = '';
+  CARDIAC_ONCALL_STAFF.forEach(n => {
+    const el = document.createElement('div');
+    el.className = 's-chip' + (selCardiacOncall.has(n) ? ' sel' : '');
+    el.style.cssText = selCardiacOncall.has(n) ? 'background:var(--red-dim);border-color:var(--red);color:var(--red);font-weight:700' : '';
+    el.textContent = n;
+    el.onclick = () => {
+      selCardiacOncall.has(n) ? selCardiacOncall.delete(n) : selCardiacOncall.add(n);
+      renderCardiacOncall();
+    };
+    g.appendChild(el);
+  });
+}
+
+// オンコール外呼び出し：全スタッフから選択
+function renderExtCallerGrid() {
+  const g = document.getElementById('ext-caller-grid');
+  if (!g) return;
+  g.innerHTML = '';
+  STAFF.forEach(n => {
+    const el = document.createElement('div');
+    el.className = 's-chip' + (selExtCallers.has(n) ? ' sel' : '');
+    if (selExtCallers.has(n)) {
+      el.style.cssText = 'background:rgba(234,88,12,0.15);border-color:var(--orange);color:var(--orange);font-weight:700';
+    }
+    el.textContent = n;
+    el.onclick = () => {
+      selExtCallers.has(n) ? selExtCallers.delete(n) : selExtCallers.add(n);
+      renderExtCallerGrid();
+      updateProg();
+    };
+    g.appendChild(el);
+  });
+}
+
+
+// ===================== ONCALL TOGGLE =====================
+function toggleOC(type, val) {
+  if (type === 'call') {
+    ocCall = val;
+    document.getElementById('oc-call-yes').className = 'tgl-btn' + (val==='yes'?' tgl-yes':'');
+    document.getElementById('oc-call-no').className = 'tgl-btn' + (val==='no'?' tgl-no':'');
+  } else if (type === 'ext') {
+    ocExt = val;
+    document.getElementById('oc-ext-yes').className = 'tgl-btn' + (val==='yes'?' tgl-yes':'');
+    document.getElementById('oc-ext-no').className = 'tgl-btn' + (val==='no'?' tgl-no':'');
+    // あり→パネル展開、なし→パネル閉じて選択リセット
+    const panel = document.getElementById('ext-caller-panel');
+    if (val === 'yes') {
+      panel.classList.add('show');
+    } else {
+      panel.classList.remove('show');
+      selExtCallers.clear();
+      renderExtCallerGrid();
+    }
+  } else if (type === 'cardiac') {
+    ocCardiac = val;
+    document.getElementById('oc-cardiac-yes').className = 'tgl-btn' + (val==='yes'?' tgl-yes':'');
+    document.getElementById('oc-cardiac-no').className = 'tgl-btn' + (val==='no'?' tgl-no':'');
+  }
+  updateProg();
+}
+
+// ===================== TASKS =====================
+// タスク名→グローバルインデックスのマップ（特殊文字IDバグ回避）
+const TASK_INDEX_MAP = {};
+(()=>{ let idx=0; TASK_GROUPS.forEach(g=>g.tasks.forEach(n=>{ TASK_INDEX_MAP[n]=idx++; })); })();
+const TASK_BY_INDEX = [];
+(()=>{ TASK_GROUPS.forEach(g=>g.tasks.forEach(n=>TASK_BY_INDEX.push(n))); })();
+
+function renderTasks() {
+  const c = document.getElementById('task-container');
+  c.innerHTML = '';
+  const q = searchQuery.toLowerCase();
+
+  TASK_GROUPS.forEach(grp => {
+    // 検索時はマッチする業務のあるグループだけ表示
+    const matched = grp.tasks.filter(n => !q || n.toLowerCase().includes(q));
+    if (q && !matched.length) return;
+
+    const gd = document.createElement('div');
+    const isCollapsed = collapsedGroups.has(grp.id) && !q;
+    const activeCount = grp.tasks.filter(n=>(taskCounts[n]||0)>0).length;
+
+    // ラベル（クリックで折りたたみ）
+    const labelEl = document.createElement('div');
+    labelEl.className = `tg-label tg-cat-${grp.cat}` + (isCollapsed?' collapsed':'');
+    labelEl.innerHTML = `
+      <span>${grp.label}${activeCount?`<span class="tg-count-badge">${activeCount}</span>`:''}</span>
+      <span class="tg-toggle">▼</span>`;
+    labelEl.onclick = () => {
+      if (searchQuery) return; // 検索中は折りたたみ無効
+      if (collapsedGroups.has(grp.id)) collapsedGroups.delete(grp.id);
+      else collapsedGroups.add(grp.id);
+      renderTasks();
+    };
+    gd.appendChild(labelEl);
+
+    // 内容
+    const content = document.createElement('div');
+    content.className = 'collapsible-content';
+    if (isCollapsed) content.classList.add('hidden');
+
+    const list = document.createElement('div');
+    list.className = 'task-list';
+
+    const tasksToRender = q ? matched : grp.tasks;
+    tasksToRender.forEach(name => {
+      const idx = TASK_INDEX_MAP[name];
+      const cnt = taskCounts[name] || 0;
+      const row = document.createElement('div');
+      row.className = `task-row cat-${grp.cat}` + (cnt > 0 ? ' active' : '');
+      row.id = `tr-${idx}`;
+      row.style.flexDirection = 'column';
+      row.style.alignItems = 'stretch';
+      row.style.gap = '8px';
+
+      // 上段：業務名＋合計件数表示
+      const topDiv = document.createElement('div');
+      topDiv.style.cssText = 'display:flex;align-items:center;gap:10px;width:100%';
+      topDiv.innerHTML = `
+        <div class="task-name" style="flex:1">${highlightMatch(name, q)}</div>
+        <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
+          <span style="font-size:10px;color:var(--text-dim);letter-spacing:0.05em">合計</span>
+          <span class="cnt-val ${cnt>0?'nonzero':''}" id="cv-${idx}" style="min-width:24px;text-align:right">${cnt}</span>
+        </div>`;
+      row.appendChild(topDiv);
+
+      // 下段：時間帯ごとに個別の±カウンター
+      const slotsDiv = document.createElement('div');
+      slotsDiv.className = 'slot-counters';
+      slotsDiv.id = `ts-${idx}`;
+      const slots = taskSlots[name] || { early:0, mid:0, late:0 };
+      TIME_SLOTS.forEach(ts => {
+        const slotVal = slots[ts.key]||0;
+        const slotEl = document.createElement('div');
+        slotEl.className = 'slot-counter' + (slotVal>0?' active':'');
+        slotEl.innerHTML = `
+          <div class="slot-label">${ts.short}</div>
+          <div class="slot-controls">
+            <button class="slot-btn minus" data-idx="${idx}" data-slot="${ts.key}" data-delta="-1" onclick="chgSlot(this)">−</button>
+            <span class="slot-val">${slotVal}</span>
+            <button class="slot-btn plus" data-idx="${idx}" data-slot="${ts.key}" data-delta="1" onclick="chgSlot(this)">＋</button>
+          </div>`;
+        slotsDiv.appendChild(slotEl);
+      });
+      row.appendChild(slotsDiv);
+      list.appendChild(row);
+    });
+    content.appendChild(list);
+    gd.appendChild(content);
+    c.appendChild(gd);
+  });
+
+  // 結果なし表示
+  if (q && !c.children.length) {
+    c.innerHTML = `<div class="empty-state" style="padding:30px 20px"><div class="ei">🔍</div><p>「${q}」に一致する業務が見つかりません</p></div>`;
+  }
+}
+
+function highlightMatch(text, q) {
+  if (!q) return text;
+  const idx = text.toLowerCase().indexOf(q);
+  if (idx < 0) return text;
+  return text.slice(0,idx) + `<mark style="background:var(--yellow);color:#000;padding:0 2px;border-radius:3px">${text.slice(idx,idx+q.length)}</mark>` + text.slice(idx+q.length);
+}
+
+// 時間帯ごとの±操作（新設計）
+function chgSlot(btn) {
+  const idx = parseInt(btn.dataset.idx);
+  const slotKey = btn.dataset.slot;
+  const delta = parseInt(btn.dataset.delta);
+  const name = TASK_BY_INDEX[idx];
+  if (!name) return;
+  if (!taskSlots[name]) taskSlots[name] = { early:0, mid:0, late:0 };
+  const nxt = Math.max(0, (taskSlots[name][slotKey]||0) + delta);
+  taskSlots[name][slotKey] = nxt;
+  // 合計を自動再計算
+  taskCounts[name] = (taskSlots[name].early||0) + (taskSlots[name].mid||0) + (taskSlots[name].late||0);
+  renderTasks();
+  renderFavTasks();
+  updateProg();
+}
+
+// 時間帯タップで+1、件数合計にも反映（旧・よく使う業務用）
+function toggleSlot(name, slotKey) {
+  if (!taskSlots[name]) taskSlots[name] = { early:0, mid:0, late:0 };
+  taskSlots[name][slotKey] = (taskSlots[name][slotKey]||0) + 1;
+  const total = (taskSlots[name].early||0) + (taskSlots[name].mid||0) + (taskSlots[name].late||0);
+  taskCounts[name] = total;
+  renderTasks();
+  renderFavTasks();
+  updateProg();
+}
+
+function chgCntByIdx(btn) {
+  const idx = parseInt(btn.dataset.idx);
+  const delta = parseInt(btn.dataset.delta);
+  const name = TASK_BY_INDEX[idx];
+  if (!name) return;
+  if (!taskSlots[name]) taskSlots[name] = { early:0, mid:0, late:0 };
+  // よく使う業務用：+は準夜、-は後ろから削る
+  if (delta > 0) {
+    taskSlots[name].early = (taskSlots[name].early||0) + 1;
+  } else {
+    if (taskSlots[name].late > 0) taskSlots[name].late--;
+    else if (taskSlots[name].mid > 0) taskSlots[name].mid--;
+    else if (taskSlots[name].early > 0) taskSlots[name].early--;
+  }
+  taskCounts[name] = (taskSlots[name].early||0) + (taskSlots[name].mid||0) + (taskSlots[name].late||0);
+  renderTasks();
+  renderFavTasks();
+  updateProg();
+}
+
+// ===================== よく使う業務 =====================
+function renderFavTasks() {
+  const sec = document.getElementById('fav-tasks-section');
+  if (!sec) return;
+  // localStorage から頻度データ取得
+  const freq = JSON.parse(localStorage.getItem('ce_v3_freq')||'{}');
+  const top = Object.entries(freq)
+    .filter(([n])=>TASK_BY_INDEX.includes(n))
+    .sort((a,b)=>b[1]-a[1])
+    .slice(0,6)
+    .map(([n])=>n);
+
+  if (!top.length || searchQuery) { sec.innerHTML=''; return; }
+
+  sec.innerHTML = `
+    <div class="fav-section">
+      <div class="fav-title">⭐ よく使う業務（過去の頻度順）</div>
+      <div class="task-list" id="fav-list"></div>
+    </div>`;
+  const list = document.getElementById('fav-list');
+  top.forEach(name => {
+    const idx = TASK_INDEX_MAP[name];
+    const cnt = taskCounts[name]||0;
+    const cat = (TASK_GROUPS.find(g=>g.tasks.includes(name))||{}).cat||'b';
+    const row = document.createElement('div');
+    row.className = `task-row cat-${cat}` + (cnt>0?' active':'');
+    row.style.flexDirection = 'column';
+    row.style.alignItems = 'stretch';
+    row.style.gap = '8px';
+
+    const topDiv = document.createElement('div');
+    topDiv.style.cssText = 'display:flex;align-items:center;gap:10px;width:100%';
+    topDiv.innerHTML = `
+      <div class="task-name" style="flex:1">${name}</div>
+      <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
+        <span style="font-size:10px;color:var(--text-dim);letter-spacing:0.05em">合計</span>
+        <span class="cnt-val ${cnt>0?'nonzero':''}" style="min-width:24px;text-align:right">${cnt}</span>
+      </div>`;
+    row.appendChild(topDiv);
+
+    const slotsDiv = document.createElement('div');
+    slotsDiv.className = 'slot-counters';
+    const slots = taskSlots[name] || { early:0, mid:0, late:0 };
+    TIME_SLOTS.forEach(ts => {
+      const slotVal = slots[ts.key]||0;
+      const slotEl = document.createElement('div');
+      slotEl.className = 'slot-counter' + (slotVal>0?' active':'');
+      slotEl.innerHTML = `
+        <div class="slot-label">${ts.short}</div>
+        <div class="slot-controls">
+          <button class="slot-btn minus" data-idx="${idx}" data-slot="${ts.key}" data-delta="-1" onclick="chgSlot(this)">−</button>
+          <span class="slot-val">${slotVal}</span>
+          <button class="slot-btn plus" data-idx="${idx}" data-slot="${ts.key}" data-delta="1" onclick="chgSlot(this)">＋</button>
+        </div>`;
+      slotsDiv.appendChild(slotEl);
+    });
+    row.appendChild(slotsDiv);
+    list.appendChild(row);
+  });
+}
+
+// 保存時に頻度を加算
+function updateFrequency(tasks) {
+  const freq = JSON.parse(localStorage.getItem('ce_v3_freq')||'{}');
+  Object.keys(tasks).forEach(n => freq[n] = (freq[n]||0) + 1);
+  localStorage.setItem('ce_v3_freq', JSON.stringify(freq));
+}
+
+// ===================== 検索 =====================
+function filterTasks(val) {
+  searchQuery = val.trim();
+  document.getElementById('task-search-wrap').classList.toggle('has-text', !!searchQuery);
+  renderTasks();
+}
+
+function clearSearch() {
+  document.getElementById('task-search').value = '';
+  searchQuery = '';
+  document.getElementById('task-search-wrap').classList.remove('has-text');
+  renderTasks();
+}
+
+// ===================== 前回コピー =====================
+function copyPrevious() {
+  const recs = getRecords().sort((a,b)=>b.date.localeCompare(a.date));
+  const today = document.getElementById('shift-date').value;
+  // 今日と同じ日付以外で最新のもの
+  const prev = recs.find(r => r.date !== today);
+  if (!prev) { showToast('⚠ コピーできる過去の記録がありません','#ff9944'); return; }
+
+  if (!confirm(`${fmtDate(prev.date)} の記録をコピーして今日の入力にしますか？（現在の入力内容は上書きされます）`)) return;
+
+  taskCounts = { ...(prev.tasks||{}) };
+  taskSlots = {};
+  // 時間帯情報があれば復元、なければ「前半」にまとめる
+  Object.entries(prev.tasks||{}).forEach(([n,v])=>{
+    if (prev.taskSlots && prev.taskSlots[n]) taskSlots[n] = {...prev.taskSlots[n]};
+    else taskSlots[n] = { early:v, mid:0, late:0 };
+  });
+  freeTasks = [...(prev.freeTasks||[])];
+  selStaff = new Set(prev.staff||[]);
+  selOncall = new Set(prev.oncall||[]);
+  selCardiacOncall = new Set(prev.cardiacOncall||[]);
+  selExtCallers = new Set(prev.extCallers||[]);
+  ocCall = prev.ocCall||null;
+  ocExt = prev.ocExt||null;
+  ocCardiac = prev.ocCardiac||null;
+
+  renderStaff();
+  renderOncall();
+  renderTasks();
+  renderFavTasks();
+  renderFree();
+  renderExtCallerGrid();
+  if (ocCall) toggleOC('call', ocCall);
+  if (ocExt) toggleOC('ext', ocExt);
+  updateProg();
+  showToast(`📋 ${fmtDate(prev.date)} をコピーしました`);
+}
+
+function updatePrevCopyButton() {
+  const btn = document.getElementById('copy-prev-btn');
+  if (!btn) return;
+  const recs = getRecords();
+  btn.disabled = !recs.length;
+}
+
+// ===================== FREE TASKS =====================
+function addFree() { freeTasks.push({ name:'', count:1 }); renderFree(); }
+function renderFree() {
+  const c = document.getElementById('free-container');
+  c.innerHTML = '';
+  freeTasks.forEach((ft,i) => {
+    const row = document.createElement('div');
+    row.className = 'free-row';
+    row.innerHTML = `
+      <input type="text" placeholder="業務名・対応内容" value="${ft.name}" oninput="freeTasks[${i}].name=this.value">
+      <input type="number" class="free-cnt" min="1" value="${ft.count}" oninput="freeTasks[${i}].count=parseInt(this.value)||1">
+      <button class="rm-btn" onclick="freeTasks.splice(${i},1);renderFree()">×</button>`;
+    c.appendChild(row);
+  });
+}
+
+// ===================== PROGRESS =====================
+function updateProg() {
+  let f = 0;
+  if (document.getElementById('shift-date').value) f++;
+  if (selStaff.size > 0) f++;
+  if (selOncall.size > 0) f++;
+  if (ocCall !== null) f++;
+  if (Object.values(taskCounts).some(v=>v>0) || freeTasks.some(ft=>ft.name)) f++;
+  const pct = Math.round(f/5*100);
+  document.getElementById('prog-fill').style.width = pct+'%';
+  document.getElementById('prog-txt').textContent = `${f} / 5`;
+}
+
+// ===================== SAVE =====================
+function saveRecord() {
+  const date = document.getElementById('shift-date').value;
+  if (!date) { showToast('⚠ 日付を選択してください','#ff9944'); return; }
+  const tasks = Object.fromEntries(Object.entries(taskCounts).filter(([,v])=>v>0));
+  const savedSlots = {};
+  Object.keys(tasks).forEach(n => { if (taskSlots[n]) savedSlots[n] = {...taskSlots[n]}; });
+
+  const record = {
+    date, staff:[...selStaff], oncall:[...selOncall], ocCall, ocExt,
+    extCallers: ocExt==='yes' ? [...selExtCallers] : [],
+    ocCardiac,
+    cardiacOncall:[...selCardiacOncall],
+    tasks,
+    taskSlots: savedSlots,
+    freeTasks: freeTasks.filter(ft=>ft.name.trim()),
+    memo: document.getElementById('shift-memo').value.trim(),
+    savedAt: new Date().toISOString(),
+    syncStatus: 'pending' // 初期状態は未送信
+  };
+  const recs = getRecords();
+  const idx = recs.findIndex(r=>r.date===date);
+  if (idx>=0) {
+    if (!confirm(`${fmtDate(date)} の記録が既にあります。上書きしますか？`)) return;
+    recs[idx]=record; showToast('✓ 更新しました');
+  } else {
+    recs.push(record); showToast('✓ 保存しました');
+  }
+  localStorage.setItem('ce_v3', JSON.stringify(recs));
+  updateFrequency(tasks);
+
+  // スプレッドシート連携が設定されていれば送信
+  if (getGasUrl()) {
+    syncRecord(record);
+  }
+
+  resetForm(date);
+  updatePrevCopyButton();
+}
+
+function resetForm(fromDate) {
+  document.getElementById('shift-date').value = getNextDate(fromDate);
+  document.getElementById('shift-memo').value='';
+  selStaff.clear(); selOncall.clear(); selCardiacOncall.clear();
+  selExtCallers.clear();
+  ocCall=null; ocExt=null; ocCardiac=null;
+  taskCounts={}; taskSlots={}; freeTasks=[];
+  collapsedGroups = new Set(TASK_GROUPS.map(g=>g.id)); // デフォルトで全部折りたたみ
+  searchQuery = '';
+  if (document.getElementById('task-search')) document.getElementById('task-search').value='';
+  renderStaff(); renderOncall(); renderCardiacOncall(); renderExtCallerGrid(); renderFavTasks(); renderTasks(); renderFree();
+  ['oc-call-yes','oc-call-no','oc-ext-yes','oc-ext-no','oc-cardiac-yes','oc-cardiac-no'].forEach(id=>document.getElementById(id).className='tgl-btn');
+  document.getElementById('ext-caller-panel').classList.remove('show');
+  updateProg();
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+// ===================== STORAGE =====================
+function getRecords() { try { return JSON.parse(localStorage.getItem('ce_v3')||'[]'); } catch { return []; } }
+
+// ===================== HISTORY =====================
+function renderHistory() {
+  const ym = fmtYM(hMonth);
+  const recs = getRecords().filter(r=>r.date&&r.date.startsWith(ym)).sort((a,b)=>b.date.localeCompare(a.date));
+  const list = document.getElementById('history-list');
+  if (!recs.length) { list.innerHTML=`<div class="empty-state"><div class="ei">📋</div><p>この月の記録はありません</p></div>`; return; }
+  list.innerHTML='';
+  recs.forEach(r=>{
+    const totalCnt = Object.values(r.tasks||{}).reduce((s,v)=>s+v,0) + (r.freeTasks||[]).reduce((s,ft)=>s+(ft.count||1),0);
+    const chips = Object.entries(r.tasks||{}).slice(0,6).map(([n,c])=>`<span class="chip">${n} <span class="chip-cnt">×${c}</span></span>`).join('')
+      + ((Object.keys(r.tasks||{}).length>6)?`<span class="chip">+${Object.keys(r.tasks||{}).length-6}件</span>`:'')
+      + (r.freeTasks||[]).map(ft=>`<span class="chip" style="background:rgba(255,209,102,0.1);border-color:rgba(255,209,102,0.25);color:var(--yellow)">${ft.name} ×${ft.count||1}</span>`).join('');
+    const card = document.createElement('div');
+    card.className='rec-card';
+    const syncBadge = r.syncStatus === 'done'
+      ? `<span class="sync-badge sync-done">☁✓ 同期済</span>`
+      : r.syncStatus === 'error'
+      ? `<span class="sync-badge sync-error" onclick="resyncOne('${r.date}',event)" style="cursor:pointer" title="タップで再送信">⚠ 再送</span>`
+      : getGasUrl()
+      ? `<span class="sync-badge sync-pending" onclick="resyncOne('${r.date}',event)" style="cursor:pointer" title="タップで送信">☁ 未送信</span>`
+      : '';
+    card.innerHTML=`
+      <div class="rc-hd">
+        <div>
+          <div class="rc-date">${fmtDate(r.date)} ${syncBadge}</div>
+          <div class="rc-staff">👥 ${(r.staff||[]).join('・')||'—'}</div>
+        </div>
+        <div class="rc-right">
+          <span class="rc-total">計 ${totalCnt} 件</span>
+          <button class="del-btn" onclick="delRecord('${r.date}',event)">🗑</button>
+        </div>
+      </div>
+      <div class="task-chips">${chips}</div>
+      <div class="rc-oncall">
+        <span>OC: ${(r.oncall||[]).join('・')||'—'}</span>
+        <span class="obadge ${r.ocCall==='yes'?'yes':'no'}">呼出 ${r.ocCall==='yes'?'あり':r.ocCall==='no'?'なし':'未'}</span>
+        <span class="obadge ${r.ocExt==='yes'?'yes':'no'}">外呼出 ${r.ocExt==='yes'?'あり':r.ocExt==='no'?'なし':'未'}</span>
+        ${r.ocExt==='yes'&&(r.extCallers||[]).length?`<span style="font-size:10px;color:var(--orange);font-weight:600">→${(r.extCallers||[]).join('・')}</span>`:''}
+      </div>
+      <div class="rc-oncall" style="margin-top:3px">
+        <span>心外OC: ${(r.cardiacOncall||[]).join('・')||'—'}</span>
+        <span class="obadge ${r.ocCardiac==='yes'?'yes':'no'}">呼出 ${r.ocCardiac==='yes'?'あり':r.ocCardiac==='no'?'なし':'未'}</span>
+      </div>
+      ${r.memo?`<div class="rc-memo">📝 ${r.memo}</div>`:''}`;
+    card.onclick=e=>{ if(e.target.closest('.del-btn')||e.target.closest('.sync-badge')) return; loadRecord(r); };
+    list.appendChild(card);
+  });
+}
+
+function delRecord(date,e) {
+  e.stopPropagation();
+  if (!confirm(`${fmtDate(date)} の記録を削除しますか？`)) return;
+  localStorage.setItem('ce_v3',JSON.stringify(getRecords().filter(r=>r.date!==date)));
+  renderHistory(); showToast('🗑 削除しました','#ff6b6b');
+}
+
+function loadRecord(r) {
+  document.getElementById('shift-date').value=r.date;
+  document.getElementById('shift-memo').value=r.memo||'';
+  selStaff=new Set(r.staff||[]); selOncall=new Set(r.oncall||[]);
+  selCardiacOncall=new Set(r.cardiacOncall||[]);
+  selExtCallers=new Set(r.extCallers||[]);
+  ocCall=r.ocCall||null; ocExt=r.ocExt||null; ocCardiac=r.ocCardiac||null;
+  taskCounts={...r.tasks||{}};
+  taskSlots = {};
+  Object.entries(r.tasks||{}).forEach(([n,v])=>{
+    if (r.taskSlots && r.taskSlots[n]) taskSlots[n] = {...r.taskSlots[n]};
+    else taskSlots[n] = { early:v, mid:0, late:0 };
+  });
+  freeTasks=[...(r.freeTasks||[])];
+  // 値が入っているグループは自動展開
+  collapsedGroups = new Set(TASK_GROUPS.filter(g=>!g.tasks.some(n=>taskCounts[n]>0)).map(g=>g.id));
+  renderStaff(); renderOncall(); renderCardiacOncall();
+  renderExtCallerGrid();
+  renderFavTasks(); renderTasks(); renderFree();
+  if(ocCall) toggleOC('call',ocCall);
+  if(ocExt) toggleOC('ext',ocExt);
+  if(ocCardiac) toggleOC('cardiac',ocCardiac);
+  updateProg();
+  showTab('input'); window.scrollTo({top:0,behavior:'smooth'});
+  showToast('📋 読み込みました');
+}
+
+// ===================== MONTHLY TREND CHART =====================
+function renderMonthlyTrendChart() {
+  const allRecs = getRecords().sort((a,b)=>a.date.localeCompare(b.date));
+  if (allRecs.length === 0) return '';
+  const months = [...new Set(allRecs.map(r=>r.date.slice(0,7)))].sort();
+  if (months.length < 2) return ''; // 2ヶ月以上ないと推移にならない
+
+  // 最大6ヶ月
+  const showMonths = months.slice(-6);
+  const monthData = showMonths.map(m => {
+    const mr = allRecs.filter(r=>r.date.startsWith(m));
+    const grand = mr.reduce((s,r)=>s+Object.values(r.tasks||{}).reduce((a,v)=>a+v,0)+(r.freeTasks||[]).reduce((a,ft)=>a+(ft.count||1),0),0);
+    return { month:m, nights:mr.length, tasks:grand, avg:mr.length?grand/mr.length:0 };
+  });
+
+  const w = 320, h = 160, padL = 35, padR = 15, padT = 15, padB = 28;
+  const innerW = w - padL - padR, innerH = h - padT - padB;
+  const maxTasks = Math.max(...monthData.map(d=>d.tasks), 1);
+  const maxAvg = Math.max(...monthData.map(d=>d.avg), 1);
+
+  // Y軸（総件数）のグリッド
+  const ticks = [0, 0.25, 0.5, 0.75, 1];
+  let grid = ticks.map(t => {
+    const y = padT + innerH * (1-t);
+    return `<line class="grid-line" x1="${padL}" y1="${y}" x2="${w-padR}" y2="${y}"/>
+      <text class="axis-label" x="${padL-5}" y="${y+3}" text-anchor="end">${Math.round(maxTasks*t)}</text>`;
+  }).join('');
+
+  // 総件数の折れ線
+  const pts = monthData.map((d,i) => {
+    const x = padL + (monthData.length===1?innerW/2 : innerW * i/(monthData.length-1));
+    const y = padT + innerH * (1 - d.tasks/maxTasks);
+    return { x, y, d };
+  });
+  const pathD = pts.map((p,i)=>`${i===0?'M':'L'}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
+  const areaD = pathD + ` L${pts[pts.length-1].x.toFixed(1)},${padT+innerH} L${pts[0].x.toFixed(1)},${padT+innerH} Z`;
+
+  // X軸ラベル
+  const xLabels = monthData.map((d,i)=>{
+    const x = padL + (monthData.length===1?innerW/2 : innerW * i/(monthData.length-1));
+    const m = parseInt(d.month.slice(5,7));
+    return `<text class="axis-label" x="${x}" y="${h-8}" text-anchor="middle">${m}月</text>`;
+  }).join('');
+
+  const points = pts.map(p => `<circle class="data-point" cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="4"/>`).join('');
+  const values = pts.map(p => `<text class="axis-label" x="${p.x.toFixed(1)}" y="${(p.y-8).toFixed(1)}" text-anchor="middle" style="fill:var(--accent);font-weight:600">${p.d.tasks}</text>`).join('');
+
+  return `
+    <div class="chart-sec">
+      <h3>月別 総業務件数 推移（直近${monthData.length}ヶ月）</h3>
+      <svg class="line-chart" viewBox="0 0 ${w} ${h}" preserveAspectRatio="xMidYMid meet">
+        <defs>
+          <linearGradient id="grad-accent" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#4da6ff" stop-opacity="0.5"/>
+            <stop offset="100%" stop-color="#4da6ff" stop-opacity="0"/>
+          </linearGradient>
+        </defs>
+        ${grid}
+        <path class="data-area" d="${areaD}"/>
+        <path class="data-line" d="${pathD}"/>
+        ${points}
+        ${values}
+        ${xLabels}
+      </svg>
+      <div class="chart-legend">
+        <span class="chart-legend-item"><span class="chart-legend-dot" style="background:var(--accent)"></span>総業務件数</span>
+      </div>
+    </div>`;
+}
+
+// 最多時間帯を判定
+function getMaxSlot(slotTot) {
+  const max = Math.max(slotTot.early, slotTot.mid, slotTot.late);
+  if (max === 0) return '—';
+  if (slotTot.early === max) return '準夜';
+  if (slotTot.mid === max) return '深夜';
+  return '早朝';
+}
+
+// ===================== STATS =====================
+function renderStats() {
+  const ym = fmtYM(sMonth);
+  const recs = getRecords().filter(r=>r.date&&r.date.startsWith(ym));
+  const c = document.getElementById('stats-content');
+  if (!recs.length) { c.innerHTML=`<div class="empty-state"><div class="ei">📊</div><p>この月の記録はありません</p></div>`; return; }
+
+  const taskTot={}, staffCnt={}, staffTasks={};
+  const cardiacOncallCnt={}, cardiacCalledCnt={};
+  const extCallersCnt={};
+  let grand=0, ocCallCnt=0, ocExtCnt=0, ocCardiacCnt=0;
+  const slotTot = { early:0, mid:0, late:0 };
+  recs.forEach(r=>{
+    Object.entries(r.tasks||{}).forEach(([n,v])=>{ taskTot[n]=(taskTot[n]||0)+v; grand+=v; });
+    (r.freeTasks||[]).forEach(ft=>{ if(ft.name){ taskTot['📝'+ft.name]=(taskTot['📝'+ft.name]||0)+(ft.count||1); grand+=(ft.count||1); }});
+    (r.staff||[]).forEach(s=>{ staffCnt[s]=(staffCnt[s]||0)+1; });
+    if(r.ocCall==='yes') ocCallCnt++;
+    if(r.ocExt==='yes') ocExtCnt++;
+    if(r.ocCardiac==='yes') ocCardiacCnt++;
+    // オンコール外呼び出し者集計
+    (r.extCallers||[]).forEach(s=>{ extCallersCnt[s]=(extCallersCnt[s]||0)+1; });
+    // 心外オンコール担当者集計
+    (r.cardiacOncall||[]).forEach(s=>{ cardiacOncallCnt[s]=(cardiacOncallCnt[s]||0)+1; });
+    if(r.ocCardiac==='yes') (r.cardiacOncall||[]).forEach(s=>{ cardiacCalledCnt[s]=(cardiacCalledCnt[s]||0)+1; });
+    // 時間帯集計
+    if (r.taskSlots) {
+      Object.values(r.taskSlots).forEach(slots => {
+        slotTot.early += slots.early||0;
+        slotTot.mid += slots.mid||0;
+        slotTot.late += slots.late||0;
+      });
+    }
+  });
+  const sorted=Object.entries(taskTot).sort((a,b)=>b[1]-a[1]);
+  const maxV=sorted.length?sorted[0][1]:1;
+  const avg=recs.length?(grand/recs.length).toFixed(1):0;
+  const top=sorted.length?sorted[0][0].replace('📝',''):'—';
+
+  let html=`<div class="kpi-grid">
+    <div class="kpi-card"><div class="kpi-lbl">夜勤回数</div><div class="kpi-val" style="color:var(--accent)">${recs.length}</div><div class="kpi-sub">回</div></div>
+    <div class="kpi-card"><div class="kpi-lbl">総業務件数</div><div class="kpi-val" style="color:var(--green)">${grand}</div><div class="kpi-sub">件</div></div>
+    <div class="kpi-card"><div class="kpi-lbl">1夜勤平均</div><div class="kpi-val" style="color:var(--orange)">${avg}</div><div class="kpi-sub">件/夜勤</div></div>
+    <div class="kpi-card"><div class="kpi-lbl">OC呼び出し / 外呼び出し</div><div class="kpi-val" style="color:var(--red)">${ocCallCnt}</div><div class="kpi-sub">呼出 / 外: ${ocExtCnt}回 / 心外: ${ocCardiacCnt}回</div></div>
+  </div>
+  <div class="kpi-grid">
+    <div class="kpi-card" style="grid-column:1/-1;border-left:3px solid var(--cyan)"><div class="kpi-lbl">⏰ 最多時間帯</div><div class="kpi-val" style="color:var(--cyan);font-size:18px;padding-top:6px">${getMaxSlot(slotTot)}</div><div class="kpi-sub">準夜 ${slotTot.early} / 深夜 ${slotTot.mid} / 早朝 ${slotTot.late}</div></div>
+  </div>
+  <div class="kpi-grid"><div class="kpi-card" style="grid-column:1/-1"><div class="kpi-lbl">業務件数 TOP3</div>
+    ${sorted.slice(0,3).map(([n,v],i)=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid var(--border);font-size:12px"><span style="color:var(--text-dim);font-weight:700;margin-right:6px">${i+1}位</span><span style="flex:1;color:var(--text)">${n}</span><span style="font-weight:700;color:var(--purple)">${v}件</span></div>`).join('')}
+  </div></div>`;
+
+  // 月別推移折れ線グラフ
+  html += renderMonthlyTrendChart();
+
+  html+=`<div class="bar-sec"><h3>業務件数ランキング TOP20</h3>`;
+  sorted.slice(0,20).forEach(([n,v])=>{
+    const pct=Math.round(v/maxV*100);
+    html+=`<div class="b-row"><div class="b-lbl" title="${n}">${n}</div><div class="b-track"><div class="b-fill" style="width:${pct}%"></div></div><div class="b-cnt">${v}</div></div>`;
+  });
+  html+=`</div>`;
+
+  // calendar
+  const dateMap={};
+  recs.forEach(r=>{ const t=Object.values(r.tasks||{}).reduce((s,v)=>s+v,0)+(r.freeTasks||[]).reduce((s,ft)=>s+(ft.count||1),0); dateMap[r.date]=t; });
+  const year=parseInt(ym.slice(0,4)), month=parseInt(ym.slice(5,7))-1;
+  const first=new Date(year,month,1).getDay(), dim=new Date(year,month+1,0).getDate();
+  const maxC=Math.max(...Object.values(dateMap),1);
+  const days=['日','月','火','水','木','金','土'];
+  html+=`<div class="cal-sec"><h3>夜勤カレンダー</h3><div class="cal-grid">`;
+  days.forEach(d=>html+=`<div class="cal-dh">${d}</div>`);
+  for(let i=0;i<first;i++) html+=`<div class="cal-cell empty"></div>`;
+  for(let d=1;d<=dim;d++){
+    const ds=`${ym}-${String(d).padStart(2,'0')}`;
+    const v=dateMap[ds]||0;
+    const alpha=v>0?0.25+0.75*(v/maxC):0;
+    html+=`<div class="cal-cell" style="background:${v>0?`rgba(77,166,255,${alpha})`:'var(--surface2)'};color:${v>0?'#fff':'var(--text-dim)'}">${d}</div>`;
+  }
+  html+=`</div></div>`;
+
+  // 時間帯分布
+  if (slotTot.early + slotTot.mid + slotTot.late > 0) {
+    const slotMax = Math.max(slotTot.early, slotTot.mid, slotTot.late);
+    const slotTotal = slotTot.early + slotTot.mid + slotTot.late;
+    html+=`<div class="bar-sec"><h3>時間帯別 業務発生件数</h3>`;
+    [['準夜 (16:30-22:00)', slotTot.early, 'var(--accent)'],
+     ['深夜 (22:00-翌3:30)', slotTot.mid, 'var(--purple)'],
+     ['早朝 (翌3:30-9:00)', slotTot.late, 'var(--cyan)']].forEach(([lbl, v, col]) => {
+      const p = Math.round(v/slotMax*100);
+      const pct = slotTotal?Math.round(v/slotTotal*100):0;
+      html+=`<div class="b-row"><div class="b-lbl">${lbl}</div><div class="b-track"><div class="b-fill" style="width:${p}%;background:${col}"></div></div><div class="b-cnt">${v} <span style="color:var(--text-dim);font-size:10px">${pct}%</span></div></div>`;
+    });
+    html+=`</div>`;
+  }
+
+  // staff
+  const ss=Object.entries(staffCnt).sort((a,b)=>b[1]-a[1]);
+  if(ss.length){
+    const ms=ss[0][1];
+    html+=`<div class="bar-sec"><h3>スタッフ別夜勤回数</h3>`;
+    ss.forEach(([n,v])=>{ const p=Math.round(v/ms*100); html+=`<div class="b-row"><div class="b-lbl">${n}</div><div class="b-track"><div class="b-fill" style="width:${p}%;background:var(--green)"></div></div><div class="b-cnt">${v}</div></div>`; });
+    html+=`</div>`;
+  }
+
+  // 心外オンコール担当者別集計
+  const cardiacEntries = CARDIAC_ONCALL_STAFF.map(n=>({
+    name:n, oncall:cardiacOncallCnt[n]||0, called:cardiacCalledCnt[n]||0
+  })).filter(d=>d.oncall>0).sort((a,b)=>b.called-a.called);
+
+  if(cardiacEntries.length){
+    const maxOc=Math.max(...cardiacEntries.map(d=>d.oncall),1);
+    html+=`<div class="bar-sec"><h3>心外オンコール 担当者別集計</h3>
+      <div style="display:flex;gap:12px;margin-bottom:10px;font-size:11px;color:var(--text-muted)">
+        <span><span style="display:inline-block;width:10px;height:10px;background:var(--cyan);border-radius:2px;margin-right:4px"></span>担当回数</span>
+        <span><span style="display:inline-block;width:10px;height:10px;background:var(--red);border-radius:2px;margin-right:4px"></span>呼び出し回数</span>
+      </div>`;
+    cardiacEntries.forEach(d=>{
+      const pOc=Math.round(d.oncall/maxOc*100);
+      const pCa=Math.round(d.called/maxOc*100);
+      const rate=d.oncall?Math.round(d.called/d.oncall*100):0;
+      html+=`<div class="b-row">
+        <div class="b-lbl">${d.name}</div>
+        <div style="flex:1;display:flex;flex-direction:column;gap:3px">
+          <div class="b-track"><div class="b-fill" style="width:${pOc}%;background:var(--cyan)"></div></div>
+          <div class="b-track"><div class="b-fill" style="width:${pCa}%;background:var(--red)"></div></div>
+        </div>
+        <div style="text-align:right;flex-shrink:0;width:60px;font-size:11px;font-family:'JetBrains Mono',monospace">
+          <div style="color:var(--cyan)">${d.oncall}回</div>
+          <div style="color:var(--red)">${d.called}回(${rate}%)</div>
+        </div>
+      </div>`;
+    });
+    html+=`</div>`;
+  }
+
+  // オンコール外呼び出し者ランキング
+  const extEntries = Object.entries(extCallersCnt).sort((a,b)=>b[1]-a[1]);
+  if (extEntries.length) {
+    const maxE = extEntries[0][1];
+    html += `<div class="bar-sec"><h3>📞 オンコール外呼び出し スタッフ別回数</h3>
+      <div style="font-size:11px;color:var(--text-muted);margin-bottom:10px">オンコール外で呼び出されたスタッフの集計</div>`;
+    extEntries.forEach(([n,v])=>{
+      const p=Math.round(v/maxE*100);
+      html+=`<div class="b-row"><div class="b-lbl">${n}</div><div class="b-track"><div class="b-fill" style="width:${p}%;background:var(--orange)"></div></div><div class="b-cnt">${v}</div></div>`;
+    });
+    html+=`</div>`;
+  }
+
+  c.innerHTML=html;
+}
+
+// ===================== EXCEL EXPORT =====================
+function exportXLSX(mode) {
+  const ym = fmtYM(mode==='stats'||mode==='insight'||mode==='report'?sMonth:hMonth);
+  let recs = getRecords();
+  if (mode === 'annual') {
+    recs = recs.filter(r=>r.date&&r.date.startsWith(String(annualYear)));
+  } else if (mode !== 'all') {
+    recs = recs.filter(r=>r.date&&r.date.startsWith(ym));
+  }
+  recs = recs.sort((a,b)=>a.date.localeCompare(b.date));
+  if (!recs.length) { showToast('⚠ データがありません','#ff9944'); return; }
+
+  const wb = XLSX.utils.book_new();
+
+  // ===== Sheet1: 日次生データ =====
+  const allTasks = [...new Set(recs.flatMap(r=>Object.keys(r.tasks||{})))].sort();
+  const allFreeNames = [...new Set(recs.flatMap(r=>(r.freeTasks||[]).map(ft=>ft.name).filter(Boolean)))].sort();
+  const headers1 = ['日付','曜日','夜勤者','オンコール担当','呼び出し','オンコール外呼び出し','オンコール外呼び出し者','心外オンコール担当','心外OC呼び出し',
+    ...allTasks,...allFreeNames.map(n=>'[自由]'+n),'業務合計','準夜件数(16:30-22:00)','深夜件数(22:00-翌3:30)','早朝件数(翌3:30-9:00)','メモ'];
+  const data1 = recs.map(r=>{
+    const dow=['日','月','火','水','木','金','土'][new Date(r.date+'T00:00:00').getDay()];
+    const taskCols = allTasks.map(t=>r.tasks?.[t]||0);
+    const freeCols = allFreeNames.map(n=>{ const ft=(r.freeTasks||[]).find(f=>f.name===n); return ft?ft.count||1:0; });
+    const total = taskCols.reduce((s,v)=>s+v,0)+freeCols.reduce((s,v)=>s+v,0);
+    const slots = { early:0, mid:0, late:0 };
+    if (r.taskSlots) Object.values(r.taskSlots).forEach(s=>{ slots.early+=s.early||0; slots.mid+=s.mid||0; slots.late+=s.late||0; });
+    return [r.date, dow, (r.staff||[]).join('・'), (r.oncall||[]).join('・'),
+      r.ocCall==='yes'?'あり':r.ocCall==='no'?'なし':'',
+      r.ocExt==='yes'?'あり':r.ocExt==='no'?'なし':'',
+      (r.extCallers||[]).join('・'),
+      (r.cardiacOncall||[]).join('・'),
+      r.ocCardiac==='yes'?'あり':r.ocCardiac==='no'?'なし':'',
+      ...taskCols,...freeCols, total, slots.early, slots.mid, slots.late, r.memo||''];
+  });
+  const ws1 = XLSX.utils.aoa_to_sheet([headers1,...data1]);
+  ws1['!cols'] = headers1.map((h,i)=>{ if(i===0) return {wch:12}; if(i===2||i===3) return {wch:30}; if(i===headers1.length-1) return {wch:40}; return {wch:Math.max(10,h.length*2)}; });
+  XLSX.utils.book_append_sheet(wb, ws1, '日次生データ');
+
+  // ===== Sheet2: 月次集計 =====
+  const months = [...new Set(recs.map(r=>r.date.slice(0,7)))].sort();
+  const cardiacHeaders = CARDIAC_ONCALL_STAFF.map(n=>`心外_${n}_担当回数`).concat(CARDIAC_ONCALL_STAFF.map(n=>`心外_${n}_呼出回数`));
+  const sumHeaders = ['月','夜勤回数','総業務件数','1夜勤平均','OC呼び出し','OC外呼び出し','心外OC呼び出し','準夜件数','深夜件数','早朝件数',...cardiacHeaders,...allTasks,...allFreeNames.map(n=>'[自由]'+n)];
+  const sumData = months.map(m=>{
+    const mr = recs.filter(r=>r.date.startsWith(m));
+    const taskSums = allTasks.map(t=>mr.reduce((s,r)=>s+(r.tasks?.[t]||0),0));
+    const freeSums = allFreeNames.map(n=>mr.reduce((s,r)=>{ const ft=(r.freeTasks||[]).find(f=>f.name===n); return s+(ft?ft.count||1:0); },0));
+    const grand = [...taskSums,...freeSums].reduce((s,v)=>s+v,0);
+    const ocC = mr.filter(r=>r.ocCall==='yes').length;
+    const ocE = mr.filter(r=>r.ocExt==='yes').length;
+    const ocCa = mr.filter(r=>r.ocCardiac==='yes').length;
+    const slots = { early:0, mid:0, late:0 };
+    mr.forEach(r=>{ if(r.taskSlots) Object.values(r.taskSlots).forEach(s=>{ slots.early+=s.early||0; slots.mid+=s.mid||0; slots.late+=s.late||0; }); });
+    const cardiacCols = CARDIAC_ONCALL_STAFF.map(n=>mr.filter(r=>(r.cardiacOncall||[]).includes(n)).length)
+      .concat(CARDIAC_ONCALL_STAFF.map(n=>mr.filter(r=>(r.cardiacOncall||[]).includes(n)&&r.ocCardiac==='yes').length));
+    return [m, mr.length, grand, grand?+(grand/mr.length).toFixed(1):0, ocC, ocE, ocCa, slots.early, slots.mid, slots.late, ...cardiacCols, ...taskSums,...freeSums];
+  });
+  const ws2 = XLSX.utils.aoa_to_sheet([sumHeaders,...sumData]);
+  ws2['!cols'] = sumHeaders.map((h,i)=>({wch: i<9?14:Math.max(10,h.length*2)}));
+  XLSX.utils.book_append_sheet(wb, ws2, mode==='annual' ? '月別推移' : '月次集計');
+
+  // ===== Sheet3: 業務別ランキング =====
+  const taskTot={};
+  recs.forEach(r=>{
+    Object.entries(r.tasks||{}).forEach(([n,v])=>taskTot[n]=(taskTot[n]||0)+v);
+    (r.freeTasks||[]).forEach(ft=>{ if(ft.name) taskTot['[自由]'+ft.name]=(taskTot['[自由]'+ft.name]||0)+(ft.count||1); });
+  });
+  const ranked = Object.entries(taskTot).sort((a,b)=>b[1]-a[1]);
+  const ws3 = XLSX.utils.aoa_to_sheet([['順位','業務名','合計件数','月平均件数'], ...ranked.map(([n,v],i)=>[i+1,n,v,+(v/months.length).toFixed(1)])]);
+  ws3['!cols'] = [{wch:6},{wch:36},{wch:12},{wch:12}];
+  XLSX.utils.book_append_sheet(wb, ws3, '業務別ランキング');
+
+  // ===== Sheet4: スタッフ別集計 =====
+  const staffNight={}, staffTasks={};
+  recs.forEach(r=>{
+    (r.staff||[]).forEach(s=>{
+      staffNight[s]=(staffNight[s]||0)+1;
+      if(!staffTasks[s]) staffTasks[s]={};
+      Object.entries(r.tasks||{}).forEach(([n,v])=>staffTasks[s][n]=(staffTasks[s][n]||0)+v);
+      (r.freeTasks||[]).forEach(ft=>{ if(ft.name) staffTasks[s]['[自由]'+ft.name]=(staffTasks[s]['[自由]'+ft.name]||0)+(ft.count||1); });
+    });
+  });
+  const staffList = Object.keys(staffNight).sort((a,b)=>staffNight[b]-staffNight[a]);
+  const ws4Headers = ['スタッフ','夜勤回数','担当業務件数合計','業務内訳 TOP3',...allTasks,...allFreeNames.map(n=>'[自由]'+n)];
+  const ws4Data = staffList.map(s=>{
+    const tc=allTasks.map(t=>staffTasks[s]?.[t]||0);
+    const fc=allFreeNames.map(n=>staffTasks[s]?.['[自由]'+n]||0);
+    const top3 = Object.entries(staffTasks[s]||{}).sort((a,b)=>b[1]-a[1]).slice(0,3).map(([n,v])=>`${n}:${v}件`).join(' / ');
+    return [s,staffNight[s],[...tc,...fc].reduce((a,v)=>a+v,0),top3,...tc,...fc];
+  });
+  const ws4 = XLSX.utils.aoa_to_sheet([ws4Headers,...ws4Data]);
+  ws4['!cols'] = [{wch:14},{wch:10},{wch:16},{wch:60},...ws4Headers.slice(4).map(h=>({wch:Math.max(10,h.length*2)}))];
+  XLSX.utils.book_append_sheet(wb, ws4, 'スタッフ別集計');
+
+  // ===== Sheet3: 日付別・人別ランキング =====
+  {
+    // annualモードは年間全件、それ以外は月次（recsはすでに絞り込み済み）
+    const targetRecs = recs;
+
+    // 日付別
+    const dailyRows = [['日付','曜日','担当者','業務件数','業務内訳TOP3']];
+    targetRecs.map(r=>{
+      const dow=['日','月','火','水','木','金','土'][new Date(r.date+'T00:00:00').getDay()];
+      const total = Object.values(r.tasks||{}).reduce((s,v)=>s+v,0)+(r.freeTasks||[]).reduce((s,ft)=>s+(ft.count||1),0);
+      const top3 = Object.entries(r.tasks||{}).sort((a,b)=>b[1]-a[1]).slice(0,3).map(([n,v])=>`${n}:${v}件`).join(' / ');
+      return { date:r.date, dow, staff:(r.staff||[]).join('・'), total, top3 };
+    }).sort((a,b)=>b.total-a.total).forEach(d=>dailyRows.push([d.date,d.dow,d.staff,d.total,d.top3]));
+
+    // 人別
+    const staffMap = {};
+    targetRecs.forEach(r=>{
+      (r.staff||[]).forEach(s=>{
+        if (!staffMap[s]) staffMap[s]={nights:0,total:0,tasks:{}};
+        staffMap[s].nights++;
+        Object.entries(r.tasks||{}).forEach(([n,v])=>{ staffMap[s].total+=v; staffMap[s].tasks[n]=(staffMap[s].tasks[n]||0)+v; });
+        (r.freeTasks||[]).forEach(ft=>{ staffMap[s].total+=(ft.count||1); });
+      });
+    });
+    const staffRows = [['担当者','夜勤回数','総業務件数','1夜勤平均','業務内訳 TOP3']];
+    Object.entries(staffMap).sort((a,b)=>b[1].total-a[1].total).forEach(([name,d])=>{
+      const top3 = Object.entries(d.tasks).sort((a,b)=>b[1]-a[1]).slice(0,3).map(([n,v])=>`${n}:${v}件`).join(' / ');
+      staffRows.push([name,d.nights,d.total,+(d.total/d.nights).toFixed(1),top3]);
+    });
+
+    const ws3data = [
+      ['■ 日付別 業務対応件数ランキング'],
+      ...dailyRows,
+      [''],
+      ['■ 人別 業務対応件数ランキング'],
+      ...staffRows,
+    ];
+    const wsRank = XLSX.utils.aoa_to_sheet(ws3data);
+    wsRank['!cols'] = [{wch:12},{wch:6},{wch:20},{wch:10},{wch:50}];
+    XLSX.utils.book_append_sheet(wb, wsRank, '日付・人別ランキング');
+  }
+
+  // ===== 年次専用Sheet: 月別サマリー =====
+  if (mode === 'annual') {
+    const annualMonths = [...new Set(recs.map(r=>r.date.slice(0,7)))].sort();
+    const assistKwA = ['V-A ECMO開始','V-V ECMO開始','IABP開始','Impella CP導入','Impella 5.5導入'];
+    const emergKwA = ['緊急カテーテル','心筋生検','心嚢穿刺'];
+    const annualRows = [['月','夜勤回数','総業務件数','1夜勤平均','OC呼び出し','OC外呼び出し','心外OC呼び出し','補助循環導入','緊急カテ対応','準夜件数','深夜件数','早朝件数','最多対応日','最多対応件数']];
+    annualMonths.forEach(m=>{
+      const mr = recs.filter(r=>r.date.startsWith(m));
+      const grand = mr.reduce((s,r)=>s+Object.values(r.tasks||{}).reduce((a,v)=>a+v,0)+(r.freeTasks||[]).reduce((a,ft)=>a+(ft.count||1),0),0);
+      const ocC = mr.filter(r=>r.ocCall==='yes').length;
+      const ocE = mr.filter(r=>r.ocExt==='yes').length;
+      const ocCa = mr.filter(r=>r.ocCardiac==='yes').length;
+      const taskTotM = {};
+      mr.forEach(r=>Object.entries(r.tasks||{}).forEach(([n,v])=>taskTotM[n]=(taskTotM[n]||0)+v));
+      const assistM = Object.entries(taskTotM).filter(([n])=>assistKwA.some(k=>n.includes(k))).reduce((s,[,v])=>s+v,0);
+      const emergM = Object.entries(taskTotM).filter(([n])=>emergKwA.some(k=>n.includes(k))).reduce((s,[,v])=>s+v,0);
+      const slots = {early:0,mid:0,late:0};
+      mr.forEach(r=>{ if(r.taskSlots) Object.values(r.taskSlots).forEach(s=>{ slots.early+=s.early||0; slots.mid+=s.mid||0; slots.late+=s.late||0; }); });
+      const peakDay = mr.map(r=>({date:r.date,total:Object.values(r.tasks||{}).reduce((s,v)=>s+v,0)+(r.freeTasks||[]).reduce((s,ft)=>s+(ft.count||1),0)})).sort((a,b)=>b.total-a.total)[0];
+      annualRows.push([m, mr.length, grand, grand?+(grand/mr.length).toFixed(1):0, ocC, ocE, ocCa, assistM, emergM, slots.early, slots.mid, slots.late, peakDay?.date||'', peakDay?.total||0]);
+    });
+    const wsAnnual = XLSX.utils.aoa_to_sheet(annualRows);
+    wsAnnual['!cols'] = [{wch:8},{wch:10},{wch:12},{wch:12},{wch:12},{wch:12},{wch:12},{wch:12},{wch:12},{wch:10},{wch:10},{wch:10},{wch:14},{wch:12}];
+    XLSX.utils.book_append_sheet(wb, wsAnnual, '月別サマリー（年次）');
+  }
+
+  // ===== Sheet5: 分析レポート（insightモード or statsモード） =====
+  if (mode==='insight'||mode==='stats'||mode==='all') {
+    const allRecsAll = getRecords().sort((a,b)=>a.date.localeCompare(b.date));
+    const allMonths = [...new Set(allRecsAll.map(r=>r.date.slice(0,7)))].sort();
+    const reportRows = [
+      ['CE夜勤業務 分析レポート', '', `出力日: ${new Date().toLocaleDateString('ja-JP')}`],
+      ['対象期間', mode==='all'?`${allMonths[0]} 〜 ${allMonths[allMonths.length-1]}`:ym, ''],
+      [''],
+      ['■ サマリー指標', '', ''],
+      ['項目','値','備考'],
+    ];
+
+    // 月別サマリーを追加
+    allMonths.forEach(m=>{
+      const mr = allRecsAll.filter(r=>r.date.startsWith(m));
+      const grand = mr.reduce((s,r)=>s+Object.values(r.tasks||{}).reduce((a,v)=>a+v,0)+(r.freeTasks||[]).reduce((a,ft)=>a+(ft.count||1),0),0);
+      const ocC = mr.filter(r=>r.ocCall==='yes').length;
+      const ocE = mr.filter(r=>r.ocExt==='yes').length;
+      reportRows.push([m+'月', `夜勤${mr.length}回 / 総業務${grand}件 / 平均${grand?(grand/mr.length).toFixed(1):0}件/夜 / 呼出${ocC}回(外${ocE}回)`, '']);
+    });
+    reportRows.push(['']);
+    reportRows.push(['■ 業務別件数（全期間）','','']);
+    reportRows.push(['業務名','合計件数','月平均']);
+    ranked.forEach(([n,v])=>reportRows.push([n,v,+(v/allMonths.length).toFixed(1)]));
+
+    // メモがあれば追加
+    const memo = document.getElementById('report-memo')?.value?.trim();
+    if (memo) { reportRows.push(['']); reportRows.push(['■ 上申・報告書用メモ','','']); reportRows.push([memo]); }
+
+    const ws5 = XLSX.utils.aoa_to_sheet(reportRows);
+    ws5['!cols'] = [{wch:36},{wch:50},{wch:20}];
+    XLSX.utils.book_append_sheet(wb, ws5, '分析レポート');
+  }
+
+  const fname = mode==='all' ? `CE夜勤業務集計_全期間.xlsx`
+    : mode==='insight' ? `CE夜勤業務_分析レポート_${ym}.xlsx`
+    : mode==='annual' ? `CE夜勤業務集計_${annualYear}年.xlsx`
+    : mode==='report' ? `CE夜勤業務_上申資料_${ym}.xlsx`
+    : `CE夜勤業務集計_${ym}.xlsx`;
+  XLSX.writeFile(wb, fname);
+  showToast('📊 Excel出力しました');
+}
+
+// ===================== DELETE MODAL =====================
+let pendingDeleteDate = null;
+
+function delRecord(date, e) {
+  e.stopPropagation();
+  pendingDeleteDate = date;
+  document.getElementById('modal-date-lbl').textContent = fmtDate(date);
+  document.getElementById('del-modal').classList.add('show');
+}
+
+function closeDelModal() {
+  pendingDeleteDate = null;
+  document.getElementById('del-modal').classList.remove('show');
+}
+
+function confirmDelete() {
+  if (!pendingDeleteDate) return;
+  localStorage.setItem('ce_v3', JSON.stringify(getRecords().filter(r=>r.date!==pendingDeleteDate)));
+  closeDelModal();
+  renderHistory();
+  showToast('🗑 削除しました','#ff6b6b');
+}
+
+// クリックで閉じる
+document.getElementById('del-modal').addEventListener('click', function(e) {
+  if (e.target === this) closeDelModal();
+});
+
+// ===================== STATS VIEW SWITCH =====================
+let currentStatsView = 'stats';
+function switchStatsView(view) {
+  currentStatsView = view;
+  document.getElementById('stats-content').style.display = view==='stats'?'block':'none';
+  document.getElementById('insight-content').style.display = view==='insight'?'block':'none';
+  document.getElementById('report-content').style.display = view==='report'?'block':'none';
+  const sb = document.getElementById('stats-view-btn');
+  const ib = document.getElementById('insight-view-btn');
+  const rb = document.getElementById('report-view-btn');
+  sb.style.cssText = view==='stats'?'border-color:var(--accent);color:var(--accent)':'';
+  ib.style.cssText = view==='insight'?'border-color:var(--purple);color:var(--purple)':'';
+  rb.style.cssText = view==='report'?'border-color:var(--yellow);color:var(--yellow)':'';
+  if (view==='insight') renderInsights();
+  if (view==='report') renderReport();
+}
+
+
+function renderInsights() {
+  const ym = fmtYM(sMonth);
+  const allRecs = getRecords().sort((a,b)=>a.date.localeCompare(b.date));
+  const curRecs = allRecs.filter(r=>r.date&&r.date.startsWith(ym));
+  const c = document.getElementById('insight-content');
+
+  if (!curRecs.length) {
+    c.innerHTML=`<div class="empty-state"><div class="ei">💡</div><p>この月の記録がありません<br>業務を入力すると分析が表示されます</p></div>`;
+    return;
+  }
+
+  // 前月データ
+  const prevMonth = new Date(sMonth.getFullYear(), sMonth.getMonth()-1, 1);
+  const prevYM = fmtYM(prevMonth);
+  const prevRecs = allRecs.filter(r=>r.date&&r.date.startsWith(prevYM));
+
+  // 集計関数
+  function calcGrand(recs) {
+    return recs.reduce((s,r)=> s + Object.values(r.tasks||{}).reduce((a,v)=>a+v,0) + (r.freeTasks||[]).reduce((a,ft)=>a+(ft.count||1),0), 0);
+  }
+  function calcTaskTot(recs) {
+    const t={};
+    recs.forEach(r=>{
+      Object.entries(r.tasks||{}).forEach(([n,v])=>t[n]=(t[n]||0)+v);
+      (r.freeTasks||[]).forEach(ft=>{ if(ft.name) t['[自由]'+ft.name]=(t['[自由]'+ft.name]||0)+(ft.count||1); });
+    });
+    return t;
+  }
+
+  const curGrand = calcGrand(curRecs);
+  const prevGrand = calcGrand(prevRecs);
+  const curTasks = calcTaskTot(curRecs);
+  const prevTasks = calcTaskTot(prevRecs);
+  const curNights = curRecs.length;
+  const prevNights = prevRecs.length;
+  const curAvg = curNights ? curGrand/curNights : 0;
+  const prevAvg = prevNights ? prevGrand/prevNights : 0;
+  const curOcCall = curRecs.filter(r=>r.ocCall==='yes').length;
+  const curOcExt = curRecs.filter(r=>r.ocExt==='yes').length;
+  const curOcCardiacCnt = curRecs.filter(r=>r.ocCardiac==='yes').length;
+  const prevOcCall = prevRecs.filter(r=>r.ocCall==='yes').length;
+
+  // オンコール外呼び出し者集計（分析用）
+  const curExtCallersCnt = {};
+  curRecs.forEach(r=>{ if(r.ocExt==='yes') (r.extCallers||[]).forEach(s=>{ curExtCallersCnt[s]=(curExtCallersCnt[s]||0)+1; }); });
+
+  // スタッフ別夜勤数
+  const staffNights = {};
+  curRecs.forEach(r=>(r.staff||[]).forEach(s=>staffNights[s]=(staffNights[s]||0)+1));
+  const nightCounts = Object.values(staffNights);
+  const maxNights = Math.max(...nightCounts,0);
+  const minNights = Math.min(...nightCounts,0);
+  const avgNights = nightCounts.length ? nightCounts.reduce((a,v)=>a+v,0)/nightCounts.length : 0;
+
+
+  // 時間帯別集計
+  const slotTot = { early:0, mid:0, late:0 };
+  curRecs.forEach(r=>{
+    if (r.taskSlots) Object.values(r.taskSlots).forEach(s=>{
+      slotTot.early+=s.early||0; slotTot.mid+=s.mid||0; slotTot.late+=s.late||0;
+    });
+  });
+
+  // 前月比計算
+  function delta(cur, prev) {
+    if (!prev) return null;
+    const d = ((cur-prev)/prev*100).toFixed(0);
+    return { val: d, badge: d>0?`<span class="delta-badge delta-up">▲${d}%</span>`: d<0?`<span class="delta-badge delta-down">▼${Math.abs(d)}%</span>`:`<span class="delta-badge delta-flat">±0%</span>` };
+  }
+
+  const insights = [];
+
+  // ① 業務量前月比
+  const d1 = delta(curGrand, prevGrand);
+  if (d1) {
+    const lvl = Math.abs(d1.val)>=20 ? (d1.val>0?'alert':'good') : (d1.val>0?'warn':'good');
+    insights.push({ level: lvl,
+      label: `業務総量 ${d1.badge}`,
+      body: `今月の総業務件数は ${curGrand} 件（前月 ${prevGrand} 件）。1夜勤平均 ${curAvg.toFixed(1)} 件（前月 ${prevAvg.toFixed(1)} 件）。`,
+      suggest: d1.val>0
+        ? `業務量が増加しています。人員配置・増員の根拠として活用できます。`
+        : `業務量が減少しています。引き続きデータを蓄積して傾向を確認してください。`
+    });
+  } else {
+    insights.push({ level: 'default',
+      label: '業務総量',
+      body: `今月の総業務件数は ${curGrand} 件。1夜勤平均 ${curAvg.toFixed(1)} 件。`,
+      suggest: '2ヶ月以上データを蓄積すると前月比較ができるようになります。'
+    });
+  }
+
+  // ② オンコール呼び出し率
+  const ocRate = curNights ? (curOcCall/curNights*100).toFixed(0) : 0;
+  const ocExtRate = curNights ? (curOcExt/curNights*100).toFixed(0) : 0;
+  const prevOcRate = prevNights ? (prevOcCall/prevNights*100).toFixed(0) : null;
+  const extCallersStr = Object.entries(curExtCallersCnt).sort((a,b)=>b[1]-a[1]).map(([n,v])=>`${n}(${v}回)`).join('・');
+  insights.push({ level: ocRate>=50?'alert': ocRate>=30?'warn':'good',
+    label: `オンコール呼び出し率 ${ocRate}%`,
+    body: `${curNights} 夜勤中 ${curOcCall} 回呼び出し（率 ${ocRate}%）。オンコール外呼び出し ${curOcExt} 回（${ocExtRate}%）${extCallersStr?`　呼び出し者：${extCallersStr}`:''}。心外OC呼び出し ${curOcCardiacCnt} 回。${prevOcRate!==null?` 前月 ${prevOcRate}%。`:''}`,
+    suggest: ocRate>=50
+      ? `呼び出し率が高水準です。夜勤体制の見直し・増員・オンコール負担軽減策の検討を上申する根拠になります。オンコール外呼び出しが多い場合は即応体制の整備も検討してください。`
+      : ocRate>=30
+      ? `呼び出し率がやや高めです。オンコール外呼び出しの状況（誰が・何回呼ばれているか）を確認し体制改善の参考にしてください。`
+      : `呼び出し率は低水準で安定しています。`
+  });
+
+
+  // ③ 補助循環導入件数・率
+  const assistCircKw = ['V-A ECMO開始','V-V ECMO開始','IABP開始','Impella CP導入','Impella 5.5導入'];
+  const assistCircCount = Object.entries(curTasks)
+    .filter(([n])=>assistCircKw.some(k=>n.includes(k)))
+    .reduce((s,[,v])=>s+v,0);
+  const assistCircRate = curNights ? (assistCircCount/curNights*100).toFixed(0) : 0;
+  insights.push({ level: assistCircRate>=50?'alert': assistCircRate>=30?'warn': assistCircCount>0?'default':'good',
+    label: `補助循環導入 ${assistCircCount} 件（導入率 ${assistCircRate}%）`,
+    body: `V-A ECMO・V-V ECMO・IABP・Impella の開始・導入件数の合計。${curNights} 夜勤中 ${assistCircCount} 件（夜勤あたり導入率 ${assistCircRate}%）。`,
+    suggest: assistCircRate>=50
+      ? `補助循環導入率が高水準です。高度な専門技術が求められる夜間体制の強化・増員を訴える根拠として有効です。`
+      : assistCircCount>0
+      ? `補助循環導入が発生しています。継続的な記録が夜間体制強化の根拠資料になります。`
+      : `今月は補助循環導入なし。`
+  });
+
+  // ④ 緊急カテーテル対応件数・率
+  const emergCathKw = ['緊急カテーテル','心筋生検','心嚢穿刺'];
+  const emergCathCount = Object.entries(curTasks)
+    .filter(([n])=>emergCathKw.some(k=>n.includes(k)))
+    .reduce((s,[,v])=>s+v,0);
+  const emergCathRate = curNights ? (emergCathCount/curNights*100).toFixed(0) : 0;
+  const pacingCount = curTasks['体外式ペースメーカー挿入'] || 0;
+  insights.push({ level: emergCathRate>=50?'alert': emergCathRate>=30?'warn': emergCathCount>0?'default':'good',
+    label: `緊急カテーテル対応 ${emergCathCount} 件（対応率 ${emergCathRate}%）`,
+    body: `緊急カテーテル（CAG/PCI/EVT等）・心筋生検・心嚢穿刺の合計。${curNights} 夜勤中 ${emergCathCount} 件（対応率 ${emergCathRate}%）。${pacingCount>0?`うち体外式ペースメーカー挿入 ${pacingCount} 件（別集計）。`:''}`,
+    suggest: emergCathRate>=50
+      ? `緊急カテーテル対応が高頻度です。夜間の即応体制・人員確保の根拠として活用できます。`
+      : emergCathCount>0
+      ? `緊急カテーテル対応が発生しています。継続的な記録で体制強化の根拠資料になります。`
+      : `今月は緊急カテーテル対応なし。`
+  });
+
+  // ③-2 時間帯分析
+  const slotSum = slotTot.early + slotTot.mid + slotTot.late;
+  if (slotSum > 0) {
+    const maxSlot = getMaxSlot(slotTot);
+    const slotPcts = {
+      準夜: Math.round(slotTot.early/slotSum*100),
+      深夜: Math.round(slotTot.mid/slotSum*100),
+      早朝: Math.round(slotTot.late/slotSum*100)
+    };
+    const midHeavy = slotPcts.深夜 >= 40;
+    insights.push({ level: midHeavy?'warn':'default',
+      label: `⏰ 業務集中時間帯：${maxSlot}（${slotPcts[maxSlot]}%）`,
+      body: `準夜 ${slotTot.early}件(${slotPcts.準夜}%) / 深夜 ${slotTot.mid}件(${slotPcts.深夜}%) / 早朝 ${slotTot.late}件(${slotPcts.早朝}%)`,
+      suggest: midHeavy
+        ? `深夜帯に業務が集中しています。スタッフの疲労ピークと重なるため、深夜帯の応援体制やオンコール呼び出し頻度の見直しを検討してください。`
+        : `時間帯別の業務分布を継続記録することで、シフト設計や仮眠時間の最適化の根拠資料になります。`
+    });
+  }
+
+  // ⑤ 業務トップ3と対策
+  const top3 = Object.entries(curTasks).sort((a,b)=>b[1]-a[1]).slice(0,3);
+  if (top3.length) {
+    const top3str = top3.map(([n,v],i)=>`${i+1}位: ${n}（${v}件）`).join('、');
+    const prevTop = prevTasks ? Object.entries(prevTasks).sort((a,b)=>b[1]-a[1])[0]?.[0] : null;
+    insights.push({ level: 'default',
+      label: `今月の業務件数 TOP3`,
+      body: top3str + (prevTop && prevTop!==top3[0][0] ? `　前月1位は「${prevTop}」でした。` : ''),
+      suggest: '最頻業務に対してマニュアル整備・スキル均一化・機器の整備を行うことで対応品質向上・時間短縮が期待できます。'
+    });
+  }
+
+  // ⑥ 月次推移メッセージ
+  const monthsWithData = [...new Set(allRecs.map(r=>r.date.slice(0,7)))].sort();
+  if (monthsWithData.length >= 3) {
+    const trend = monthsWithData.slice(-3).map(m=>{
+      const mr = allRecs.filter(r=>r.date.startsWith(m));
+      return { m, grand: calcGrand(mr), nights: mr.length };
+    });
+    const increasing = trend[2].grand > trend[1].grand && trend[1].grand > trend[0].grand;
+    const decreasing = trend[2].grand < trend[1].grand && trend[1].grand < trend[0].grand;
+    const trendStr = trend.map(t=>`${t.m.slice(5)}月: ${t.grand}件`).join(' → ');
+    insights.push({ level: increasing?'alert': decreasing?'good':'default',
+      label: `直近3ヶ月の業務量推移`,
+      body: trendStr,
+      suggest: increasing
+        ? `3ヶ月連続で業務量が増加傾向です。この推移グラフは人員増員・体制強化の説得力ある根拠になります。Excel出力してご活用ください。`
+        : decreasing
+        ? `3ヶ月連続で業務量が減少傾向です。取り組みの成果や、病床・患者数の変化を確認してみましょう。`
+        : `業務量は月によって変動があります。引き続き記録を継続してください。`
+    });
+  }
+
+  // HTML生成
+  let html = `
+    <div class="insight-card">
+      <div class="ic-title">💡 今月の業務分析・課題抽出 <span style="font-size:11px;color:var(--text-dim);font-weight:400;text-transform:none">${fmtYMDisp(sMonth)}</span></div>
+      <div class="insight-list">
+        ${insights.map(ins=>`
+          <div class="insight-item ${ins.level==='default'?'':ins.level}">
+            <div class="ii-label">${ins.label}</div>
+            <div class="ii-body">${ins.body}</div>
+            <div class="ii-suggest">→ ${ins.suggest}</div>
+          </div>
+        `).join('')}
+      </div>
+    </div>`;
+
+  // ====== 日付別・人別ランキング ======
+  const dailySorted = [...curRecs].map(r=>{
+    const total = Object.values(r.tasks||{}).reduce((s,v)=>s+v,0) + (r.freeTasks||[]).reduce((s,ft)=>s+(ft.count||1),0);
+    const dow = ['日','月','火','水','木','金','土'][new Date(r.date+'T00:00:00').getDay()];
+    return { date: r.date, dow, total, tasks: r.tasks||{}, freeTasks: r.freeTasks||[], staff: r.staff||[] };
+  }).sort((a,b)=>b.total-a.total);
+
+  const staffRanking = {};
+  curRecs.forEach(r=>{
+    (r.staff||[]).forEach(s=>{
+      if (!staffRanking[s]) staffRanking[s] = { nights:0, total:0, tasks:{} };
+      staffRanking[s].nights++;
+      Object.entries(r.tasks||{}).forEach(([n,v])=>{ staffRanking[s].total+=v; staffRanking[s].tasks[n]=(staffRanking[s].tasks[n]||0)+v; });
+      (r.freeTasks||[]).forEach(ft=>{ staffRanking[s].total+=(ft.count||1); });
+    });
+  });
+  const staffSorted = Object.entries(staffRanking).map(([name,d])=>({
+    name, nights:d.nights, total:d.total,
+    avg: d.nights ? (d.total/d.nights).toFixed(1) : 0,
+    topTask: Object.entries(d.tasks).sort((a,b)=>b[1]-a[1])[0]?.[0] || '—'
+  })).sort((a,b)=>b.total-a.total);
+
+  const maxDailyTotal = dailySorted.length ? dailySorted[0].total : 1;
+  const maxStaffTotal = staffSorted.length ? staffSorted[0].total : 1;
+  const rankMedal = ['🥇','🥈','🥉'];
+
+  html += `
+    <div class="insight-card">
+      <div class="ic-title">🏆 業務対応件数ランキング</div>
+      <div style="display:flex;gap:6px;margin-bottom:12px">
+        <button id="rank-date-btn" onclick="switchRank('date')" class="tgl-btn tgl-yes" style="flex:1;font-size:12px;padding:8px">📅 日付別</button>
+        <button id="rank-staff-btn" onclick="switchRank('staff')" class="tgl-btn" style="flex:1;font-size:12px;padding:8px">👤 人別</button>
+      </div>
+
+      <!-- 日付別 -->
+      <div id="rank-date-panel">
+        ${dailySorted.map((d,i)=>{
+          const pct = Math.round(d.total/maxDailyTotal*100);
+          const taskList = [...Object.entries(d.tasks).map(([n,v])=>({n,v})),
+            ...(d.freeTasks||[]).filter(ft=>ft.name).map(ft=>({n:ft.name,v:ft.count||1}))
+          ].sort((a,b)=>b.v-a.v);
+          return `
+          <div style="margin-bottom:8px">
+            <div onclick="toggleRankDetail('date-${i}')" style="display:flex;align-items:center;gap:8px;cursor:pointer;padding:8px 0;border-bottom:1px solid var(--border)">
+              <span style="font-size:16px;flex-shrink:0">${i<3?rankMedal[i]:`<span style='font-size:11px;color:var(--text-dim);font-weight:700;width:20px;display:inline-block;text-align:center'>${i+1}</span>`}</span>
+              <div style="flex-shrink:0;width:72px">
+                <div style="font-size:12px;font-weight:700;color:var(--text)">${d.date.slice(5).replace('-','/')}（${d.dow}）</div>
+                <div style="font-size:10px;color:var(--text-dim)">${d.staff.join('・')}</div>
+              </div>
+              <div style="flex:1">
+                <div style="height:7px;background:var(--surface2);border-radius:4px;overflow:hidden">
+                  <div style="height:100%;width:${pct}%;background:${i===0?'#f59e0b':i===1?'#94a3b8':i===2?'#cd7c4a':'var(--accent)'};border-radius:4px"></div>
+                </div>
+              </div>
+              <div style="font-size:14px;font-weight:800;color:var(--text);flex-shrink:0;width:38px;text-align:right">${d.total}<span style="font-size:9px;font-weight:400;color:var(--text-dim)">件</span></div>
+              <span style="font-size:10px;color:var(--text-dim)">▼</span>
+            </div>
+            <div id="rank-detail-date-${i}" style="display:none;background:var(--surface2);border-radius:8px;padding:10px 12px;margin-top:4px;border-left:3px solid var(--accent)">
+              <div style="font-size:10px;font-weight:700;color:var(--text-dim);margin-bottom:8px">業務内訳</div>
+              ${taskList.map(({n,v})=>`
+                <div style="display:flex;justify-content:space-between;align-items:center;padding:3px 0;font-size:11px;border-bottom:1px solid var(--border)">
+                  <span style="flex:1;padding-right:8px;color:var(--text)">${n}</span>
+                  <span style="font-weight:700;color:var(--accent);background:#eff6ff;padding:1px 7px;border-radius:4px">${v}件</span>
+                </div>`).join('')}
+            </div>
+          </div>`;
+        }).join('')}
+      </div>
+
+      <!-- 人別 -->
+      <div id="rank-staff-panel" style="display:none">
+        ${staffSorted.map((d,i)=>{
+          const pct = Math.round(d.total/maxStaffTotal*100);
+          const staffRecs = curRecs.filter(r=>(r.staff||[]).includes(d.name));
+          const staffTaskTot = {};
+          staffRecs.forEach(r=>{
+            Object.entries(r.tasks||{}).forEach(([n,v])=>staffTaskTot[n]=(staffTaskTot[n]||0)+v);
+            (r.freeTasks||[]).forEach(ft=>{ if(ft.name) staffTaskTot[ft.name]=(staffTaskTot[ft.name]||0)+(ft.count||1); });
+          });
+          const top3tasks = Object.entries(staffTaskTot).sort((a,b)=>b[1]-a[1]).slice(0,3);
+          return `
+          <div style="margin-bottom:8px">
+            <div onclick="toggleRankDetail('staff-${i}')" style="display:flex;align-items:center;gap:8px;cursor:pointer;padding:8px 0;border-bottom:1px solid var(--border)">
+              <span style="font-size:16px;flex-shrink:0">${i<3?rankMedal[i]:`<span style='font-size:11px;color:var(--text-dim);font-weight:700;width:20px;display:inline-block;text-align:center'>${i+1}</span>`}</span>
+              <div style="flex-shrink:0;width:80px">
+                <div style="font-size:12px;font-weight:700;color:var(--text)">${d.name}</div>
+                <div style="font-size:10px;color:var(--text-dim)">${d.nights}夜勤・平均${d.avg}件</div>
+              </div>
+              <div style="flex:1">
+                <div style="height:7px;background:var(--surface2);border-radius:4px;overflow:hidden">
+                  <div style="height:100%;width:${pct}%;background:${i===0?'#f59e0b':i===1?'#94a3b8':i===2?'#cd7c4a':'var(--accent)'};border-radius:4px"></div>
+                </div>
+              </div>
+              <div style="font-size:14px;font-weight:800;color:var(--text);flex-shrink:0;width:38px;text-align:right">${d.total}<span style="font-size:9px;font-weight:400;color:var(--text-dim)">件</span></div>
+              <span style="font-size:10px;color:var(--text-dim)">▼</span>
+            </div>
+            <div id="rank-detail-staff-${i}" style="display:none;background:var(--surface2);border-radius:8px;padding:10px 12px;margin-top:4px;border-left:3px solid var(--purple)">
+              <div style="font-size:10px;font-weight:700;color:var(--text-dim);margin-bottom:8px">業務内訳 TOP3</div>
+              ${top3tasks.map(([n,v])=>`
+                <div style="display:flex;justify-content:space-between;align-items:center;padding:3px 0;font-size:11px;border-bottom:1px solid var(--border)">
+                  <span style="flex:1;padding-right:8px;color:var(--text)">${n}</span>
+                  <span style="font-weight:700;color:var(--purple);background:#f5f3ff;padding:1px 7px;border-radius:4px">${v}件</span>
+                </div>`).join('')}
+              <div style="font-size:10px;color:var(--text-dim);margin-top:6px">夜勤回数：${d.nights}回 / 総件数：${d.total}件 / 平均：${d.avg}件/夜勤</div>
+            </div>
+          </div>`;
+        }).join('')}
+      </div>
+    </div>`;
+
+  // 心外オンコール担当者分析
+  const cardiacInsight = CARDIAC_ONCALL_STAFF.map(n=>{
+    const oncallCnt = curRecs.filter(r=>(r.cardiacOncall||[]).includes(n)).length;
+    const calledCnt = curRecs.filter(r=>(r.cardiacOncall||[]).includes(n) && r.ocCardiac==='yes').length;
+    return { name:n, oncallCnt, calledCnt, rate: oncallCnt ? Math.round(calledCnt/oncallCnt*100) : 0 };
+  }).filter(d=>d.oncallCnt>0).sort((a,b)=>b.calledCnt-a.calledCnt);
+
+  if (cardiacInsight.length) {
+    const totalCardiacOncall = curRecs.filter(r=>(r.cardiacOncall||[]).length>0).length;
+    const totalCardiacCalled = curRecs.filter(r=>r.ocCardiac==='yes').length;
+    const overallRate = totalCardiacOncall ? Math.round(totalCardiacCalled/totalCardiacOncall*100) : 0;
+    const topCalled = cardiacInsight[0];
+
+    html += `
+    <div class="insight-card">
+      <div class="ic-title">🫀 心外オンコール 担当者別分析</div>
+      <div class="insight-list">
+        <div class="insight-item ${overallRate>=50?'alert':overallRate>=30?'warn':'default'}">
+          <div class="ii-label">心外オンコール呼び出し率 ${overallRate}%</div>
+          <div class="ii-body">担当記録あり夜勤 ${totalCardiacOncall}回中 ${totalCardiacCalled}回呼び出し。</div>
+          <div class="ii-suggest">→ ${overallRate>=50?'呼び出し率が高水準です。心外手術件数の増加・夜間緊急手術体制の見直しの根拠として活用できます。':'引き続きデータを蓄積して傾向を把握してください。'}</div>
+        </div>
+        ${topCalled.calledCnt > 0 ? `
+        <div class="insight-item warn">
+          <div class="ii-label">最多呼び出し：${topCalled.name}（${topCalled.calledCnt}回 / 呼び出し率${topCalled.rate}%）</div>
+          <div class="ii-body">
+            ${cardiacInsight.map(d=>`${d.name}：担当${d.oncallCnt}回・呼出${d.calledCnt}回(${d.rate}%)`).join('　')}
+          </div>
+          <div class="ii-suggest">→ 担当者によって呼び出し率に差がある場合、手術件数の集中や特定の時期的な傾向が考えられます。</div>
+        </div>` : ''}
+      </div>
+    </div>`;
+  }
+
+  // Excel出力用コメント欄
+  html += `
+    <div class="insight-card">
+      <div class="ic-title">📋 上申・資料用メモ</div>
+      <textarea id="report-memo" placeholder="上申・報告書に盛り込む内容をメモしておく..." style="height:100px"></textarea>
+      <button class="save-btn" style="margin-top:8px;background:var(--purple);font-size:13px;padding:11px" onclick="exportXLSX('insight')">📊 分析レポートをExcel出力</button>
+    </div>`;
+
+  c.innerHTML = html;
+}
+
+function switchRank(type) {
+  document.getElementById('rank-date-panel').style.display = type==='date'?'block':'none';
+  document.getElementById('rank-staff-panel').style.display = type==='staff'?'block':'none';
+  document.getElementById('rank-date-btn').className = 'tgl-btn' + (type==='date'?' tgl-yes':'');
+  document.getElementById('rank-staff-btn').className = 'tgl-btn' + (type==='staff'?' tgl-yes':'');
+}
+function toggleRankDetail(key) {
+  const el = document.getElementById('rank-detail-'+key);
+  if (el) el.style.display = el.style.display==='none'?'block':'none';
+}
+
+// ===================== TABS =====================
+function showTab(tab) {
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('page-'+tab).classList.add('active');
+  const idx=['input','history','stats','annual','settings'].indexOf(tab);
+  document.querySelectorAll('.tab-btn')[idx].classList.add('active');
+  if(tab==='history') renderHistory();
+  if(tab==='stats') { renderStats(); if(currentStatsView==='insight') renderInsights(); if(currentStatsView==='report') renderReport(); }
+  if(tab==='annual') renderAnnual();
+  if(tab==='settings') updateSyncStatus();
+}
+
+function changeMonth(which, d) {
+  if(which==='h') { hMonth=new Date(hMonth.getFullYear(),hMonth.getMonth()+d,1); document.getElementById('h-month-lbl').textContent=fmtYMDisp(hMonth); renderHistory(); }
+  else {
+    sMonth=new Date(sMonth.getFullYear(),sMonth.getMonth()+d,1);
+    document.getElementById('s-month-lbl').textContent=fmtYMDisp(sMonth);
+    renderStats();
+    if(currentStatsView==='insight') renderInsights();
+  }
+}
+
+// ===================== ① 入力完了チェック =====================
+function checkAndSave() {
+  const checks = [];
+  const date = document.getElementById('shift-date').value;
+  checks.push({ ok: !!date, label: '夜勤日付' });
+  checks.push({ ok: selStaff.size > 0, label: '夜勤者' });
+  checks.push({ ok: selOncall.size > 0, label: 'オンコール担当者' });
+  checks.push({ ok: ocCall !== null, label: 'オンコール呼び出しの有無' });
+  checks.push({ ok: ocExt !== null, label: 'オンコール外呼び出しの有無' });
+  checks.push({ ok: Object.values(taskCounts).some(v=>v>0) || freeTasks.some(ft=>ft.name.trim()), label: '業務内容（1件以上）' });
+
+  const ng = checks.filter(c => !c.ok);
+  const container = document.getElementById('save-check-list');
+
+  if (ng.length > 0) {
+    // 未入力項目を表示してスクロール
+    container.innerHTML = `
+      <div class="check-list">
+        ${checks.map(c=>`
+          <div class="check-item ${c.ok?'ok':'ng'}">
+            <span class="check-icon">${c.ok?'✓':'⚠'}</span>
+            <span>${c.label}</span>
+          </div>`).join('')}
+      </div>`;
+    container.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    showToast(`⚠ ${ng.length}項目が未入力です`, '#ff9944');
+    return;
+  }
+
+  // 全部OK → チェックリスト消してそのまま保存
+  container.innerHTML = '';
+  saveRecord();
+}
+
+// ===================== ④ 年次集計 =====================
+let annualYear = new Date().getFullYear();
+
+function updateLabels() {
+  document.getElementById('h-month-lbl').textContent=fmtYMDisp(hMonth);
+  document.getElementById('s-month-lbl').textContent=fmtYMDisp(sMonth);
+  document.getElementById('annual-year-lbl').textContent = annualYear + '年';
+}
+
+function changeYear(d) {
+  annualYear += d;
+  document.getElementById('annual-year-lbl').textContent = annualYear + '年';
+  renderAnnual();
+}
+
+function renderAnnual() {
+  const c = document.getElementById('annual-content');
+  const allRecs = getRecords();
+  const yearRecs = allRecs.filter(r=>r.date && r.date.startsWith(String(annualYear)));
+
+  if (!yearRecs.length) {
+    c.innerHTML = `<div class="empty-state"><div class="ei">📅</div><p>${annualYear}年のデータはありません</p></div>`;
+    return;
+  }
+
+  // 月別集計（最多対応日・補助循環・緊急カテも追加）
+  const monthData = [];
+  const assistKwY = ['V-A ECMO開始','V-V ECMO開始','IABP開始','Impella CP導入','Impella 5.5導入'];
+  const emergKwY = ['緊急カテーテル','心筋生検','心嚢穿刺'];
+  for (let m = 1; m <= 12; m++) {
+    const ym = `${annualYear}-${String(m).padStart(2,'0')}`;
+    const mr = yearRecs.filter(r=>r.date.startsWith(ym));
+    const tasks = mr.reduce((s,r)=>s+Object.values(r.tasks||{}).reduce((a,v)=>a+v,0)+(r.freeTasks||[]).reduce((a,ft)=>a+(ft.count||1),0),0);
+    // 最多対応日
+    const peakDay = mr.map(r=>({
+      date:r.date,
+      dow:['日','月','火','水','木','金','土'][new Date(r.date+'T00:00:00').getDay()],
+      total:Object.values(r.tasks||{}).reduce((s,v)=>s+v,0)+(r.freeTasks||[]).reduce((s,ft)=>s+(ft.count||1),0)
+    })).sort((a,b)=>b.total-a.total)[0];
+    // 補助循環・緊急カテ
+    const taskTotM = {};
+    mr.forEach(r=>{ Object.entries(r.tasks||{}).forEach(([n,v])=>taskTotM[n]=(taskTotM[n]||0)+v); });
+    const assistM = Object.entries(taskTotM).filter(([n])=>assistKwY.some(k=>n.includes(k))).reduce((s,[,v])=>s+v,0);
+    const emergM = Object.entries(taskTotM).filter(([n])=>emergKwY.some(k=>n.includes(k))).reduce((s,[,v])=>s+v,0);
+    monthData.push({ m, ym, label: m+'月', nights: mr.length, tasks, peakDay, assistM, emergM });
+  }
+
+  // 年間サマリー
+  const totalNights = monthData.reduce((s,d)=>s+d.nights,0);
+  const totalTasks = monthData.reduce((s,d)=>s+d.tasks,0);
+  const totalOcCall = yearRecs.filter(r=>r.ocCall==='yes').length;
+  const totalOcExt = yearRecs.filter(r=>r.ocExt==='yes').length;
+  const avgPerNight = totalNights ? (totalTasks/totalNights).toFixed(1) : 0;
+  const peakMonth = monthData.reduce((a,b)=>b.tasks>a.tasks?b:a, monthData[0]);
+
+  // 全業務集計
+  const taskTot = {};
+  yearRecs.forEach(r=>{
+    Object.entries(r.tasks||{}).forEach(([n,v])=>taskTot[n]=(taskTot[n]||0)+v);
+    (r.freeTasks||[]).forEach(ft=>{ if(ft.name) taskTot[ft.name]=(taskTot[ft.name]||0)+(ft.count||1); });
+  });
+  const topTasks = Object.entries(taskTot).sort((a,b)=>b[1]-a[1]).slice(0,5);
+  const maxTaskV = topTasks.length ? topTasks[0][1] : 1;
+
+  let html = '';
+
+  // 年間サマリーカード
+  html += `<div class="year-summary"><h3>📅 ${annualYear}年 年間サマリー</h3>
+    <div class="ys-grid">
+      <div class="ys-item"><div class="ys-label">年間夜勤回数</div><div class="ys-value" style="color:var(--accent)">${totalNights}</div><div class="ys-sub">回</div></div>
+      <div class="ys-item"><div class="ys-label">年間総業務件数</div><div class="ys-value" style="color:var(--green)">${totalTasks}</div><div class="ys-sub">件</div></div>
+      <div class="ys-item"><div class="ys-label">1夜勤平均</div><div class="ys-value" style="color:var(--orange)">${avgPerNight}</div><div class="ys-sub">件/夜勤</div></div>
+      <div class="ys-item"><div class="ys-label">オンコール呼び出し</div><div class="ys-value" style="color:var(--red)">${totalOcCall}</div><div class="ys-sub">回（外: ${totalOcExt}回）</div></div>
+      <div class="ys-item" style="grid-column:1/-1"><div class="ys-label">最多月</div><div class="ys-value" style="color:var(--purple);font-size:16px;padding-top:4px">${peakMonth.label}（${peakMonth.tasks}件）</div></div>
+    </div>
+  </div>`;
+
+  // 月別グリッド
+  html += `<div class="card" style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px;margin-bottom:10px">
+    <div class="card-hdr c-blue" style="margin-bottom:12px">月別 夜勤回数 / 業務件数</div>
+    <div class="year-grid">`;
+  monthData.forEach(d => {
+    if (d.nights > 0) {
+      html += `<div class="month-card has-data" onclick="goToMonth('${d.ym}')">
+        <div class="mc-month">${d.label}</div>
+        <div class="mc-nights">${d.nights}</div>
+        <div class="mc-tasks">${d.tasks}件</div>
+        ${d.peakDay ? `<div style="font-size:8px;color:var(--orange);margin-top:2px">最多:${d.peakDay.date.slice(5).replace('-','/')}(${d.peakDay.total}件)</div>` : ''}
+      </div>`;
+    } else {
+      html += `<div class="month-card empty">
+        <div class="mc-month">${d.label}</div>
+        <div class="mc-nights">—</div>
+        <div class="mc-tasks">0件</div>
+      </div>`;
+    }
+  });
+  html += `</div></div>`;
+
+  // 補助循環・緊急カテ年間推移
+  const monthsWithAssist = monthData.filter(d=>d.nights>0&&(d.assistM>0||d.emergM>0));
+  if (monthsWithAssist.length > 0) {
+    html += `<div class="bar-sec"><h3>補助循環導入 / 緊急カテーテル対応 月別推移</h3>
+      <div style="display:flex;gap:12px;margin-bottom:10px;font-size:11px;color:var(--text-muted)">
+        <span><span style="display:inline-block;width:10px;height:10px;background:var(--red);border-radius:2px;margin-right:4px"></span>補助循環</span>
+        <span><span style="display:inline-block;width:10px;height:10px;background:var(--orange);border-radius:2px;margin-right:4px"></span>緊急カテ</span>
+      </div>`;
+    const maxAE = Math.max(...monthData.map(d=>Math.max(d.assistM,d.emergM)),1);
+    monthData.filter(d=>d.nights>0).forEach(d=>{
+      const pA = Math.round(d.assistM/maxAE*100);
+      const pE = Math.round(d.emergM/maxAE*100);
+      html += `<div class="b-row">
+        <div class="b-lbl">${d.label}</div>
+        <div style="flex:1;display:flex;flex-direction:column;gap:3px">
+          <div class="b-track"><div class="b-fill" style="width:${pA}%;background:var(--red)"></div></div>
+          <div class="b-track"><div class="b-fill" style="width:${pE}%;background:var(--orange)"></div></div>
+        </div>
+        <div style="text-align:right;flex-shrink:0;width:60px;font-size:11px;font-family:'JetBrains Mono',monospace">
+          <div style="color:var(--red)">${d.assistM}件</div>
+          <div style="color:var(--orange)">${d.emergM}件</div>
+        </div>
+      </div>`;
+    });
+    html += `</div>`;
+  }
+
+  // 月別推移（年間）SVGグラフ
+  html += renderAnnualChart(monthData);
+
+  // 年間業務TOP5
+  if (topTasks.length) {
+    html += `<div class="bar-sec"><h3>年間 業務件数 TOP5</h3>`;
+    topTasks.forEach(([n,v])=>{
+      const pct = Math.round(v/maxTaskV*100);
+      html += `<div class="b-row"><div class="b-lbl" title="${n}">${n}</div><div class="b-track"><div class="b-fill" style="width:${pct}%"></div></div><div class="b-cnt">${v}</div></div>`;
+    });
+    html += `</div>`;
+  }
+
+  c.innerHTML = html;
+}
+
+function renderAnnualChart(monthData) {
+  const w=320, h=150, padL=35, padR=10, padT=15, padB=25;
+  const innerW=w-padL-padR, innerH=h-padT-padB;
+  const maxV = Math.max(...monthData.map(d=>d.tasks), 1);
+  const pts = monthData.map((d,i)=>{
+    const x = padL + innerW*i/11;
+    const y = padT + innerH*(1-d.tasks/maxV);
+    return { x, y, d };
+  });
+  const pathD = pts.map((p,i)=>`${i===0?'M':'L'}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
+  const areaD = pathD + ` L${pts[11].x.toFixed(1)},${padT+innerH} L${pts[0].x.toFixed(1)},${padT+innerH} Z`;
+
+  // グリッド
+  const ticks = [0, 0.5, 1];
+  let grid = ticks.map(t=>{
+    const y = padT + innerH*(1-t);
+    return `<line x1="${padL}" y1="${y}" x2="${w-padR}" y2="${y}" stroke="#2a3a4e" stroke-width="1" stroke-dasharray="2,2"/>
+      <text x="${padL-4}" y="${y+3}" fill="#3a5068" font-size="9" font-family="JetBrains Mono" text-anchor="end">${Math.round(maxV*t)}</text>`;
+  }).join('');
+
+  const circles = pts.map(p=>`<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="${p.d.nights>0?4:2}" fill="${p.d.nights>0?'#4da6ff':'#2a3a4e'}" stroke="#0a0e14" stroke-width="2"/>`).join('');
+  const xLabels = pts.filter((_,i)=>i%3===0||i===11).map(p=>`<text x="${p.x.toFixed(1)}" y="${h-8}" fill="#3a5068" font-size="9" font-family="JetBrains Mono" text-anchor="middle">${p.d.label}</text>`).join('');
+
+  return `<div class="chart-sec"><h3>月別 業務件数 推移（${pts[0].d.label}〜${pts[11].d.label}）</h3>
+    <svg viewBox="0 0 ${w} ${h}" width="100%" preserveAspectRatio="xMidYMid meet">
+      <defs><linearGradient id="grad-a" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#4da6ff" stop-opacity="0.4"/><stop offset="100%" stop-color="#4da6ff" stop-opacity="0"/></linearGradient></defs>
+      ${grid}
+      <path d="${areaD}" fill="url(#grad-a)" opacity="0.4"/>
+      <path d="${pathD}" fill="none" stroke="#4da6ff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+      ${circles}
+      ${xLabels}
+    </svg>
+  </div>`;
+}
+
+// 月カードをタップすると月次集計に飛ぶ
+function goToMonth(ym) {
+  const [y, m] = ym.split('-').map(Number);
+  sMonth = new Date(y, m-1, 1);
+  showTab('stats');
+}
+
+// ===================== ⑦ 上申資料自動生成 =====================
+function renderReport() {
+  const ym = fmtYM(sMonth);
+  const allRecs = getRecords().sort((a,b)=>a.date.localeCompare(b.date));
+  const curRecs = allRecs.filter(r=>r.date&&r.date.startsWith(ym));
+  const c = document.getElementById('report-content');
+
+  if (!curRecs.length) {
+    c.innerHTML = `<div class="empty-state"><div class="ei">📄</div><p>この月の記録がありません</p></div>`;
+    return;
+  }
+
+  const prevMonth = new Date(sMonth.getFullYear(), sMonth.getMonth()-1, 1);
+  const prevYM = fmtYM(prevMonth);
+  const prevRecs = allRecs.filter(r=>r.date&&r.date.startsWith(prevYM));
+
+  const grand = curRecs.reduce((s,r)=>s+Object.values(r.tasks||{}).reduce((a,v)=>a+v,0)+(r.freeTasks||[]).reduce((a,ft)=>a+(ft.count||1),0),0);
+  const prevGrand = prevRecs.reduce((s,r)=>s+Object.values(r.tasks||{}).reduce((a,v)=>a+v,0)+(r.freeTasks||[]).reduce((a,ft)=>a+(ft.count||1),0),0);
+  const avgPerNight = curRecs.length ? (grand/curRecs.length).toFixed(1) : 0;
+  const ocCall = curRecs.filter(r=>r.ocCall==='yes').length;
+  const ocExt = curRecs.filter(r=>r.ocExt==='yes').length;
+  const ocCardiacR = curRecs.filter(r=>r.ocCardiac==='yes').length;
+  const ocRate = curRecs.length ? Math.round(ocCall/curRecs.length*100) : 0;
+
+  // オンコール外呼び出し者集計（上申用）
+  const extCallerMap = {};
+  curRecs.forEach(r=>{ if(r.ocExt==='yes') (r.extCallers||[]).forEach(s=>{ extCallerMap[s]=(extCallerMap[s]||0)+1; }); });
+  const extCallersReport = Object.entries(extCallerMap).sort((a,b)=>b[1]-a[1]).map(([n,v])=>`    ${n}：${v}回`).join('\n');
+
+  // 業務集計
+  const taskTot = {};
+  curRecs.forEach(r=>{
+    Object.entries(r.tasks||{}).forEach(([n,v])=>taskTot[n]=(taskTot[n]||0)+v);
+    (r.freeTasks||[]).forEach(ft=>{ if(ft.name) taskTot[ft.name]=(taskTot[ft.name]||0)+(ft.count||1); });
+  });
+  const topTasks = Object.entries(taskTot).sort((a,b)=>b[1]-a[1]).slice(0,5);
+
+  // 時間帯集計
+  const slots = {early:0, mid:0, late:0};
+  curRecs.forEach(r=>{ if(r.taskSlots) Object.values(r.taskSlots).forEach(s=>{ slots.early+=s.early||0; slots.mid+=s.mid||0; slots.late+=s.late||0; }); });
+  const slotSum = slots.early+slots.mid+slots.late;
+
+  // 緊急業務
+  // 補助循環導入
+  const assistKw = ['V-A ECMO開始','V-V ECMO開始','IABP開始','Impella CP導入','Impella 5.5導入'];
+  const assistCnt = Object.entries(taskTot).filter(([n])=>assistKw.some(k=>n.includes(k))).reduce((s,[,v])=>s+v,0);
+  // 緊急カテーテル・ペーシング
+  const emergKw = ['緊急カテーテル','心筋生検','心嚢穿刺'];
+  const emergCnt = Object.entries(taskTot).filter(([n])=>emergKw.some(k=>n.includes(k))).reduce((s,[,v])=>s+v,0);
+  const pacingCnt = taskTot['体外式ペースメーカー挿入'] || 0;
+
+  // 前月比
+  const deltaStr = prevGrand > 0 ? `（前月比 ${prevGrand < grand ? '+' : ''}${((grand-prevGrand)/prevGrand*100).toFixed(0)}%）` : '';
+
+  // 心外オンコール担当者集計（上申用）
+  const cardiacOncallReport = CARDIAC_ONCALL_STAFF.map(n=>{
+    const oncallCount = curRecs.filter(r=>(r.cardiacOncall||[]).includes(n)).length;
+    const calledCount = curRecs.filter(r=>(r.cardiacOncall||[]).includes(n) && r.ocCardiac==='yes').length;
+    return { name:n, oncallCount, calledCount };
+  }).filter(d=>d.oncallCount>0);
+
+  // 資料テキスト生成
+  const reportText = `━━━━━━━━━━━━━━━━━━━━━━━
+【夜勤業務実績報告】${fmtYMDisp(sMonth)}
+━━━━━━━━━━━━━━━━━━━━━━━
+
+■ 業務集中日 TOP3
+${curRecs.map(r=>({
+  date: r.date,
+  dow: ['日','月','火','水','木','金','土'][new Date(r.date+'T00:00:00').getDay()],
+  staff: (r.staff||[]).join('・'),
+  total: Object.values(r.tasks||{}).reduce((s,v)=>s+v,0)+(r.freeTasks||[]).reduce((s,ft)=>s+(ft.count||1),0)
+})).sort((a,b)=>b.total-a.total).slice(0,3).map((d,i)=>`  ${i+1}位：${d.date.slice(5).replace('-','/')}（${d.dow}）${d.staff} ${d.total}件`).join('\n')}
+
+■ 業務実績
+・総業務件数：${grand}件${deltaStr}
+・1夜勤あたり平均：${avgPerNight}件
+
+■ 業務種別 上位5項目
+${topTasks.map((([n,v],i)=>`  ${i+1}位：${n}（${v}件）`)).join('\n')}
+
+■ 時間帯別 業務発生状況
+${slotSum > 0 ? `・準夜（16:30〜22:00）：${slots.early}件（${Math.round(slots.early/slotSum*100)}%）
+・深夜（22:00〜翌3:30）：${slots.mid}件（${Math.round(slots.mid/slotSum*100)}%）
+・早朝（翌3:30〜9:00）：${slots.late}件（${Math.round(slots.late/slotSum*100)}%）` : '・時間帯データ未記録'}
+
+■ 緊急・高難度対応
+・補助循環導入件数：${assistCnt}件（導入率 ${curRecs.length?Math.round(assistCnt/curRecs.length*100):0}%）
+  （V-A ECMO・V-V ECMO・IABP・Impella 開始・導入の合計）
+・緊急カテーテル対応件数：${emergCnt}件（対応率 ${curRecs.length?Math.round(emergCnt/curRecs.length*100):0}%）
+  （緊急CAG/PCI/EVT・心筋生検・心嚢穿刺の合計）
+・体外式ペースメーカー挿入：${pacingCnt}件（別集計）
+
+■ オンコール状況
+・オンコール担当呼び出し：${ocCall}回（呼び出し率 ${ocRate}%）
+・オンコール外呼び出し：${ocExt}回
+${extCallersReport ? `  【呼び出されたスタッフ】\n${extCallersReport}` : '  （外呼び出しなし）'}
+・心外オンコール呼び出し：${ocCardiacR}回
+
+■ 心外オンコール 担当者別集計
+${cardiacOncallReport.length > 0
+  ? cardiacOncallReport.map(d=>`・${d.name}：担当${d.oncallCount}回 / 呼び出し${d.calledCount}回（呼び出し率${d.oncallCount?Math.round(d.calledCount/d.oncallCount*100):0}%）`).join('\n')
+  : '・この月の心外オンコールデータなし'}
+
+■ 所見・課題
+${ocRate >= 50 ? '・オンコール呼び出し率が'+ocRate+'%と高水準。夜勤体制の見直しが必要。' : ''}
+${ocExt > 0 ? '・オンコール外呼び出しが'+ocExt+'回発生。即応体制の整備・担当者負担の実態について周知が必要。' : ''}
+${prevGrand > 0 && grand > prevGrand*1.2 ? '・前月比'+Math.round((grand-prevGrand)/prevGrand*100)+'%増と業務量が急増。継続的な増員検討を要する。' : ''}
+${assistCnt > curRecs.length ? '・補助循環導入が1夜勤あたり1件超。高度な専門技術が求められる夜間体制の強化・増員を要する。' : ''}
+${emergCnt > curRecs.length ? '・緊急カテーテル対応が1夜勤あたり1件超。夜間の即応体制・人員確保の強化が必要。' : ''}
+${slots.mid > slots.early && slots.mid > slots.late ? '・深夜帯への業務集中が顕著。仮眠確保・夜間応援体制の整備が望まれる。' : ''}
+
+━━━━━━━━━━━━━━━━━━━━━━━
+作成日：${new Date().toLocaleDateString('ja-JP')}
+CE夜勤業務集計システム
+━━━━━━━━━━━━━━━━━━━━━━━`;
+
+  c.innerHTML = `
+    <div class="report-section">
+      <h3>📄 上申・報告書用テキスト自動生成</h3>
+      <div class="report-preview" id="report-text-preview">${reportText.replace(/</g,'&lt;').replace(/\n/g,'<br>')}</div>
+      <button class="copy-report-btn" onclick="copyReport()">📋 テキストをコピー</button>
+    </div>
+    <div class="report-section">
+      <h3>✏️ 追記・修正メモ</h3>
+      <textarea id="report-extra" placeholder="上申に追記したい内容、所見、改善策など..."></textarea>
+    </div>`;
+
+  // テキストをグローバルに保持
+  window._reportText = reportText;
+}
+
+function copyReport() {
+  const extra = document.getElementById('report-extra')?.value?.trim();
+  const full = extra ? window._reportText + '\n\n■ 追記\n' + extra : window._reportText;
+  navigator.clipboard.writeText(full).then(()=>{
+    showToast('📋 クリップボードにコピーしました');
+  }).catch(()=>{
+    // fallback
+    const ta = document.createElement('textarea');
+    ta.value = full;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    showToast('📋 コピーしました');
+  });
+}
+
+// ===================== BACKUP / RESTORE =====================
+function exportJSON() {
+  const data = {
+    version: 'v5',
+    exportedAt: new Date().toISOString(),
+    records: getRecords(),
+    frequency: JSON.parse(localStorage.getItem('ce_v3_freq')||'{}')
+  };
+  const blob = new Blob([JSON.stringify(data,null,2)], {type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  const ts = new Date().toISOString().slice(0,10).replace(/-/g,'');
+  a.download = `CE夜勤業務_バックアップ_${ts}.json`;
+  a.click();
+  showToast('💾 バックアップしました');
+}
+
+function importJSON(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const data = JSON.parse(e.target.result);
+      if (!data.records || !Array.isArray(data.records)) throw new Error('不正な形式');
+      const cnt = data.records.length;
+      if (!confirm(`${cnt} 件の記録を復元しますか？\n現在のデータとマージされます（同じ日付は新しいもので上書き）。`)) {
+        event.target.value=''; return;
+      }
+      const existing = getRecords();
+      const merged = [...existing];
+      data.records.forEach(r => {
+        const idx = merged.findIndex(m=>m.date===r.date);
+        if (idx>=0) merged[idx]=r;
+        else merged.push(r);
+      });
+      localStorage.setItem('ce_v3', JSON.stringify(merged));
+      if (data.frequency) localStorage.setItem('ce_v3_freq', JSON.stringify(data.frequency));
+      showToast(`📥 ${cnt} 件を復元しました`);
+      renderHistory();
+      updatePrevCopyButton();
+    } catch(err) {
+      showToast('⚠ 復元失敗：ファイル形式が不正です','#ff6b6b');
+    }
+    event.target.value='';
+  };
+  reader.readAsText(file);
+}
+
+// ===================== GOOGLE SHEETS SYNC =====================
+function getGasUrl() { return localStorage.getItem('ce_gas_url') || ''; }
+
+function saveGasUrl() {
+  const url = document.getElementById('gas-url').value.trim();
+  localStorage.setItem('ce_gas_url', url);
+  updateSyncStatus();
+}
+
+function updateSyncStatus() {
+  const url = getGasUrl();
+  const st = document.getElementById('sync-status');
+  if (!st) return;
+  if (url) {
+    st.className = 'settings-status status-on';
+    st.innerHTML = '✓ 設定済み';
+  } else {
+    st.className = 'settings-status status-off';
+    st.innerHTML = '○ 未設定';
+  }
+  // ローカル記録数表示
+  const recs = getRecords();
+  const pending = recs.filter(r=>r.syncStatus!=='done').length;
+  const lc = document.getElementById('local-count');
+  if (lc) lc.textContent = `${recs.length} 件（未送信 ${pending} 件）`;
+  const sm = document.getElementById('sync-summary');
+  if (sm) sm.textContent = pending ? `未送信 ${pending} 件あります` : '全件送信済み';
+  document.getElementById('gas-url').value = url;
+}
+
+// 1件送信
+async function syncRecord(record) {
+  const url = getGasUrl();
+  if (!url) return { ok:false, error:'URL未設定' };
+
+  try {
+    // GAS doPostはCORS対応が必要。text/plainで送ることでpreflight回避
+    const response = await fetch(url, {
+      method: 'POST',
+      mode: 'cors',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify(record)
+    });
+    if (!response.ok) throw new Error('HTTP ' + response.status);
+    const result = await response.json();
+    if (result.ok) {
+      // syncStatusを更新
+      const recs = getRecords();
+      const idx = recs.findIndex(r=>r.date===record.date);
+      if (idx>=0) {
+        recs[idx].syncStatus = 'done';
+        recs[idx].syncedAt = new Date().toISOString();
+        localStorage.setItem('ce_v3', JSON.stringify(recs));
+      }
+      return { ok:true };
+    } else {
+      throw new Error(result.error||'不明なエラー');
+    }
+  } catch (err) {
+    const recs = getRecords();
+    const idx = recs.findIndex(r=>r.date===record.date);
+    if (idx>=0) {
+      recs[idx].syncStatus = 'error';
+      recs[idx].syncError = err.message;
+      localStorage.setItem('ce_v3', JSON.stringify(recs));
+    }
+    return { ok:false, error:err.message };
+  }
+}
+
+// 接続テスト
+async function testConnection() {
+  const url = getGasUrl();
+  if (!url) { showToast('⚠ URLを入力してください','#ff9944'); return; }
+  const btn = document.getElementById('test-connection-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinning">⟳</span> 接続中...';
+  try {
+    const response = await fetch(url + '?action=ping', { method:'GET', mode:'cors' });
+    if (!response.ok) throw new Error('HTTP ' + response.status);
+    const result = await response.json();
+    if (result.ok) {
+      showToast('✅ 接続成功！スプレッドシートと繋がりました');
+    } else {
+      throw new Error(result.error||'応答エラー');
+    }
+  } catch (err) {
+    showToast('❌ 接続失敗: ' + err.message, '#ff6b6b');
+  }
+  btn.disabled = false;
+  btn.innerHTML = '🔗 接続テスト';
+}
+
+// 未送信データを一括送信
+async function syncAll() {
+  const url = getGasUrl();
+  if (!url) { showToast('⚠ URLを設定してください','#ff9944'); return; }
+  const recs = getRecords();
+  const pending = recs.filter(r=>r.syncStatus!=='done');
+  if (!pending.length) { showToast('✓ 全件送信済みです'); return; }
+
+  const btn = document.getElementById('sync-all-btn');
+  btn.disabled = true;
+
+  let success = 0, failed = 0;
+  for (let i=0; i<pending.length; i++) {
+    btn.innerHTML = `<span class="spinning">⟳</span> 送信中... ${i+1}/${pending.length}`;
+    const result = await syncRecord(pending[i]);
+    if (result.ok) success++;
+    else failed++;
+  }
+  btn.disabled = false;
+  btn.innerHTML = '🔄 未送信データをまとめて送信';
+  updateSyncStatus();
+  renderHistory();
+  if (failed === 0) showToast(`✅ ${success} 件すべて送信完了`);
+  else showToast(`⚠ 成功${success} / 失敗${failed}`, '#ff9944');
+}
+
+// 1件だけ再送信
+async function resyncOne(date, e) {
+  e.stopPropagation();
+  const rec = getRecords().find(r=>r.date===date);
+  if (!rec) return;
+  showToast('⟳ 送信中...', 'var(--accent)');
+  const result = await syncRecord(rec);
+  if (result.ok) { showToast('✅ 送信しました'); renderHistory(); }
+  else showToast('❌ 送信失敗: '+result.error, '#ff6b6b');
+}
+
+// ===================== スプレッドシートからの復元 =====================
+async function restoreFromSheet() {
+  const url = getGasUrl();
+  if (!url) { showToast('⚠ URLを設定してください','#ff9944'); return; }
+
+  if (!confirm('スプレッドシートの全データをアプリに読み込みます。\n\n既存のローカルデータとマージされます（同じ日付はスプレッドシート側を優先）。\n\nよろしいですか？')) return;
+
+  const btn = document.getElementById('restore-sheet-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinning">⟳</span> 取得中...';
+
+  try {
+    const response = await fetch(url + '?action=getAll', { method: 'GET', mode: 'cors' });
+    if (!response.ok) throw new Error('HTTP ' + response.status);
+    const result = await response.json();
+
+    if (!result.ok) throw new Error(result.error || '取得失敗');
+
+    const sheetRecords = result.records || [];
+    if (!sheetRecords.length) {
+      showToast('⚠ スプレッドシートにデータがありません', '#ff9944');
+      btn.disabled = false;
+      btn.innerHTML = '☁️ スプレッドシートからアプリに復元';
+      return;
+    }
+
+    // ローカルとマージ（同じ日付はスプレッドシート優先）
+    const local = getRecords();
+    const merged = [...local];
+    let added = 0, updated = 0;
+
+    sheetRecords.forEach(sr => {
+      const idx = merged.findIndex(r => r.date === sr.date);
+      if (idx >= 0) {
+        merged[idx] = sr;
+        updated++;
+      } else {
+        merged.push(sr);
+        added++;
+      }
+    });
+
+    // 日付順でソート
+    merged.sort((a, b) => a.date.localeCompare(b.date));
+    localStorage.setItem('ce_v3', JSON.stringify(merged));
+
+    showToast(`✅ 復元完了！追加${added}件・更新${updated}件`);
+    renderHistory();
+    updateSyncStatus();
+    updatePrevCopyButton();
+
+  } catch (err) {
+    showToast('❌ 復元失敗: ' + err.message, '#ff6b6b');
+  }
+
+  btn.disabled = false;
+  btn.innerHTML = '☁️ スプレッドシートからアプリに復元';
+}
+
+
+function fmtYM(d) { return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'); }
+function fmtYMDisp(d) { return d.getFullYear()+'年'+(d.getMonth()+1)+'月'; }
+function fmtDate(s) {
+  const d=new Date(s+'T00:00:00');
+  return `${d.getFullYear()}/${String(d.getMonth()+1).padStart(2,'0')}/${String(d.getDate()).padStart(2,'0')}（${'日月火水木金土'[d.getDay()]}）`;
+}
+function showToast(msg,col) {
+  const t=document.getElementById('toast');
+  t.textContent=msg; t.style.background=col||'var(--green)';
+  t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2400);
+}
+</script>
+</body>
+</html>
