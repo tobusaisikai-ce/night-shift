@@ -3360,11 +3360,11 @@ async function printAnnualReport() {
     };
 
     const barRow = (label, val, maxVal, fy, barColor='#3b82f6', rowH=5.5) => {
-      const short = label.length>25?label.slice(0,24)+'…':label;
+      const short = label.length>20?label.slice(0,19)+'…':label;
       jpText(short,M,fy,8.5,'#1e293b');
-      const bw=maxVal>0&&isFinite(val)?Math.min(CW-50,Math.max(1,(CW-50)*val/maxVal)):1;
-      setFill(barColor); pdf.rect(M+50,fy+0.5,bw,rowH-1.5,'F');
-      jpText(val+'件',M+CW,fy,8.5,'#64748b','right');
+      const bw=maxVal>0&&isFinite(val)?Math.min(CW-LBAR-18,Math.max(1,(CW-LBAR-18)*val/maxVal)):1;
+      setFill(barColor); if(bw>0&&isFinite(bw)) pdf.rect(M+LBAR,fy+0.8,bw,rowH-2,'F');
+      jpText(val+'件',M+CW,fy,8.5,'#1e293b','right');
       hLine(fy+rowH,'#e2e8f0',0.2); return fy+rowH;
     };
 
@@ -3467,9 +3467,9 @@ async function printAnnualReport() {
     y=sectionHeader('■ 時間帯別業務分布（年間累計）',y); nl(2);
     if(slotSum>0){
       [['準夜（16:30〜22:00）',slots.early,'#3b82f6'],['深夜（22:00〜翌3:30）',slots.mid,'#7c3aed'],['早朝（翌3:30〜9:00）',slots.late,'#06b6d4']].forEach(([l,v,c])=>{
-        const pct=Math.round(v/slotSum*100),bw=Math.max(1,(CW-60)*pct/100);
-        jpText(l,M,y,9,'#1e293b'); setFill(c); if(bw>0&&isFinite(bw)) pdf.rect(M+60,y+0.5,bw,4,'F');
-        jpText(`${v}件(${pct}%)`,M+CW,y,9,'#64748b','right'); hLine(y+5.5,'#e2e8f0',0.2); y+=6;
+        const pct=Math.round(v/slotSum*100),bw=Math.max(1,(CW-LBAR-22)*pct/100);
+        jpText(l,M,y,9,'#1e293b'); setFill(c); if(bw>0&&isFinite(bw)) pdf.rect(M+LBAR,y+0.8,bw,3.5,'F');
+        jpText(`${v}件(${pct}%)`,M+CW,y,9,'#1e293b','right'); hLine(y+5.5,'#e2e8f0',0.2); y+=6;
       });
     } nl(1);
 
@@ -3602,11 +3602,12 @@ async function printAnnualReport() {
       rawRows.forEach((r,i)=>{
         if(y > H-M-10){ pdf.addPage(); y=M+15; }
         jpText(i<3?['🥇','🥈','🥉'][i]:(i+1)+'.',M+2,y,i<3?9:8,i<3?['#f59e0b','#94a3b8','#cd7c4a'][i]:'#64748b');
-        jpText(r.name,M+12,y,9,'#1e293b');
-        const bwRaw = (CW-80) * r.val / maxVal2;
-        const bw = Math.min(CW-80, Math.max(2, isFinite(bwRaw)?bwRaw:2));
-        setFill(color); pdf.rect(M+55, y+0.5, bw, 3.5, 'F');
-        jpText(`${r.val}${unit}`,M+CW,y,8,color,'right');
+        const nameShort = r.name.length>14?r.name.slice(0,13)+'…':r.name;
+        jpText(nameShort,M+10,y,9,'#1e293b');
+        const bwRaw = (CW-LBAR-18) * r.val / maxVal2;
+        const bw = Math.min(CW-LBAR-18, Math.max(2, isFinite(bwRaw)?bwRaw:2));
+        setFill(color); pdf.rect(M+LBAR, y+0.8, bw, 3.5, 'F');
+        jpText(`${r.val}${unit}`,M+CW,y,9,color,'right');
         hLine(y+5,'#e2e8f0',0.15); y+=5.5;
       });
       y += 3;
@@ -3632,7 +3633,7 @@ async function printAnnualReport() {
       jpText(i<3?['🥇','🥈','🥉'][i]:String(i+1)+'.',M+2,y,i<3?9:8,i<3?['#f59e0b','#94a3b8','#cd7c4a'][i]:'#64748b');
       jpText(`${r.date.slice(5).replace('-','/')}（${r.dow}）${r.staff}`,M+12,y,8,'#1e293b');
       const bw2=maxPeak>0 ? Math.min(CW-90, Math.max(2,(CW-90)*r.total/maxPeak)) : 2;
-      setFill('#1a2230'); pdf.rect(M+75,y+0.5,bw2,3.5,'F');
+      setFill('#1a2230'); pdf.rect(M+LBAR,y+0.8,bw2,3.5,'F');
       jpText(`${r.total}件`,M+CW,y,9,'#1e293b','right');
       hLine(y+5,'#e2e8f0',0.15); y+=5.5;
     }); nl(3);
@@ -4211,13 +4212,14 @@ async function printReport() {
       pdf.line(M, fy, M+CW, fy);
     };
 
+    const LBAR = 58; // ラベル固定幅mm（全棒グラフ共通）
     const barRow = (label, val, maxVal, fy, barColor='#3b82f6', rowH=5.5) => {
-      const short = label.length > 25 ? label.slice(0,24)+'…' : label;
-      jpText(short, M, fy, 7.5, '#1e293b');
-      const barW = maxVal>0&&isFinite(val)?Math.min(CW-50,Math.max(1,(CW-50)*val/maxVal)):1;
+      const short = label.length > 20 ? label.slice(0,19)+'…' : label;
+      jpText(short, M, fy, 8.5, '#1e293b');
+      const barW = maxVal>0&&isFinite(val)?Math.min(CW-LBAR-18,Math.max(1,(CW-LBAR-18)*val/maxVal)):1;
       setFill(barColor);
-      if(barW>0&&isFinite(barW)) pdf.rect(M+50, fy+0.5, barW, rowH-1.5, 'F');
-      jpText(val+'件', M+CW, fy, 7.5, '#64748b', 'right');
+      if(barW>0&&isFinite(barW)) pdf.rect(M+LBAR, fy+0.8, barW, rowH-2, 'F');
+      jpText(val+'件', M+CW, fy, 8.5, '#1e293b', 'right');
       hLine(fy+rowH, '#e2e8f0', 0.2);
       return fy + rowH;
     };
@@ -4348,10 +4350,10 @@ async function printReport() {
     if (slotSum > 0) {
       [['準夜（16:30〜22:00）', slots.early, '#3b82f6'],['深夜（22:00〜翌3:30）', slots.mid, '#7c3aed'],['早朝（翌3:30〜9:00）', slots.late, '#06b6d4']].forEach(([l,v,c]) => {
         const pct = Math.round(v/slotSum*100);
-        const bw = Math.max(1, (CW-60)*pct/100);
-        jpText(l, M, y, 8, '#1e293b');
-        setFill(c); if(bw>0&&isFinite(bw)) pdf.rect(M+60, y+0.5, bw, 4, 'F');
-        jpText(`${v}件(${pct}%)`, M+CW, y, 8, '#64748b', 'right');
+        const bw = Math.max(1, (CW-LBAR-22)*pct/100);
+        jpText(l, M, y, 9, '#1e293b');
+        setFill(c); if(bw>0&&isFinite(bw)) pdf.rect(M+LBAR, y+0.8, bw, 3.5, 'F');
+        jpText(`${v}件(${pct}%)`, M+CW, y, 9, '#1e293b', 'right');
         hLine(y+5.5, '#e2e8f0', 0.2); y += 6;
       });
     } else {
@@ -4407,12 +4409,12 @@ async function printReport() {
 
     // グラフ専用barRow（checkPageなし・固定レイアウト）
     const barRowFixed = (label, val, maxVal, fy, barColor='#3b82f6', rowH=4.5) => {
-      const short = label.length > 22 ? label.slice(0,21)+'…' : label;
-      jpText(short, M, fy, 7, '#1e293b');
-      const barW = maxVal>0&&isFinite(val)?Math.min(CW-48,Math.max(1,(CW-48)*val/maxVal)):1;
+      const short = label.length > 20 ? label.slice(0,19)+'…' : label;
+      jpText(short, M, fy, 8.5, '#1e293b');
+      const barW = maxVal>0&&isFinite(val)?Math.min(CW-LBAR-18,Math.max(1,(CW-LBAR-18)*val/maxVal)):1;
       setFill(barColor);
-      if(barW>0&&isFinite(barW)) pdf.rect(M+48, fy+0.3, barW, rowH-1.5, 'F');
-      jpText(val+'件', M+CW, fy, 7, '#64748b', 'right');
+      if(barW>0&&isFinite(barW)) pdf.rect(M+LBAR, fy+0.8, barW, rowH-2, 'F');
+      jpText(val+'件', M+CW, fy, 8.5, '#1e293b', 'right');
       hLine(fy+rowH, '#e2e8f0', 0.15);
       return fy + rowH;
     };
