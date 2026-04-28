@@ -685,8 +685,14 @@ textarea { height: 76px; resize: vertical; font-size: 13px; line-height: 1.6; }
     <span id="annual-year-lbl"></span>
     <button onclick="changeYear(1)">›</button>
   </div>
+  <div class="top-actions">
+    <button class="outline-btn" id="annual-view-stats-btn" onclick="switchAnnualView('stats')" style="border-color:var(--accent);color:var(--accent)">📊 集計</button>
+    <button class="outline-btn" id="annual-view-insight-btn" onclick="switchAnnualView('insight')">💡 分析</button>
+    <button class="outline-btn" id="annual-view-report-btn" onclick="switchAnnualView('report')">📄 上申資料</button>
+  </div>
   <div id="annual-content"></div>
-  <!-- 年次Excel出力ボタン（一番下・色付き） -->
+  <div id="annual-insight-content" style="display:none"></div>
+  <div id="annual-report-content" style="display:none"></div>
   <button class="save-btn" style="background:var(--cyan);margin-top:4px;font-size:14px;letter-spacing:0.04em" onclick="exportXLSX('annual')">📊 年次データをExcel出力</button>
 </div>
 
@@ -2366,10 +2372,27 @@ function updateLabels() {
   document.getElementById('annual-year-lbl').textContent = annualYear + '年';
 }
 
+let currentAnnualView = 'stats';
+
+function switchAnnualView(view) {
+  currentAnnualView = view;
+  document.getElementById('annual-content').style.display = view==='stats'?'block':'none';
+  document.getElementById('annual-insight-content').style.display = view==='insight'?'block':'none';
+  document.getElementById('annual-report-content').style.display = view==='report'?'block':'none';
+  ['stats','insight','report'].forEach(v=>{
+    const btn = document.getElementById(`annual-view-${v}-btn`);
+    if(btn) btn.style.cssText = v===view ? 'border-color:var(--accent);color:var(--accent)' : '';
+  });
+  if (view==='insight') renderAnnualInsight();
+  if (view==='report') renderAnnualReport();
+}
+
 function changeYear(d) {
   annualYear += d;
   document.getElementById('annual-year-lbl').textContent = annualYear + '年';
   renderAnnual();
+  if (currentAnnualView==='insight') renderAnnualInsight();
+  if (currentAnnualView==='report') renderAnnualReport();
 }
 
 function renderAnnual() {
@@ -2532,6 +2555,276 @@ function renderAnnualChart(monthData) {
       ${xLabels}
     </svg>
   </div>`;
+}
+
+// ===================== 年次分析 =====================
+function renderAnnualInsight() {
+  const c = document.getElementById('annual-insight-content');
+  if (!c) return;
+  const allRecs = getRecords();
+  const yearRecs = allRecs.filter(r=>r.date&&r.date.startsWith(String(annualYear)));
+  if (!yearRecs.length) { c.innerHTML=`<div class="empty-state"><div class="ei">📅</div><p>${annualYear}年のデータはありません</p></div>`; return; }
+
+  const assistKw = ['V-A ECMO開始','V-V ECMO開始','IABP開始','Impella CP導入','Impella 5.5導入'];
+  const emergKw  = ['緊急カテーテル','心筋生検','心嚢穿刺'];
+  const taskTot  = {};
+  yearRecs.forEach(r=>{ Object.entries(r.tasks||{}).forEach(([n,v])=>taskTot[n]=(taskTot[n]||0)+v); (r.freeTasks||[]).forEach(ft=>{ if(ft.name) taskTot[ft.name]=(taskTot[ft.name]||0)+(ft.count||1); }); });
+  const grand    = Object.values(taskTot).reduce((s,v)=>s+v,0);
+  const nights   = yearRecs.length;
+  const avg      = nights?(grand/nights).toFixed(1):0;
+  const assistCnt= Object.entries(taskTot).filter(([n])=>assistKw.some(k=>n.includes(k))).reduce((s,[,v])=>s+v,0);
+  const emergCnt = Object.entries(taskTot).filter(([n])=>emergKw.some(k=>n.includes(k))).reduce((s,[,v])=>s+v,0);
+  const ocCallCnt= yearRecs.filter(r=>r.ocCall==='yes').length;
+  const ocExtCnt = yearRecs.filter(r=>r.ocExt==='yes').length;
+  const slots    = {early:0,mid:0,late:0};
+  yearRecs.forEach(r=>{ if(r.taskSlots) Object.values(r.taskSlots).forEach(s=>{ slots.early+=s.early||0; slots.mid+=s.mid||0; slots.late+=s.late||0; }); });
+  const top3     = Object.entries(taskTot).sort((a,b)=>b[1]-a[1]).slice(0,3);
+  const months   = [...Array(12)].map((_,i)=>String(annualYear)+'-'+String(i+1).padStart(2,'0'));
+  const monthLabels = months.map(m=>m.slice(5)+'月');
+  const monthGrands = months.map(m=>yearRecs.filter(r=>r.date.startsWith(m)).reduce((s,r)=>s+Object.values(r.tasks||{}).reduce((a,v)=>a+v,0)+(r.freeTasks||[]).reduce((a,ft)=>a+(ft.count||1),0),0));
+  const monthAssist = months.map(m=>{ const tt={}; yearRecs.filter(r=>r.date.startsWith(m)).forEach(r=>Object.entries(r.tasks||{}).forEach(([n,v])=>tt[n]=(tt[n]||0)+v)); return Object.entries(tt).filter(([n])=>assistKw.some(k=>n.includes(k))).reduce((s,[,v])=>s+v,0); });
+  const monthEmerg  = months.map(m=>{ const tt={}; yearRecs.filter(r=>r.date.startsWith(m)).forEach(r=>Object.entries(r.tasks||{}).forEach(([n,v])=>tt[n]=(tt[n]||0)+v)); return Object.entries(tt).filter(([n])=>emergKw.some(k=>n.includes(k))).reduce((s,[,v])=>s+v,0); });
+  const monthOCRate = months.map(m=>{ const mr=yearRecs.filter(r=>r.date.startsWith(m)); return mr.length?Math.round(mr.filter(r=>r.ocCall==='yes').length/mr.length*100):0; });
+  const cardiacEntries = CARDIAC_ONCALL_STAFF.map(n=>[n,{oncall:yearRecs.filter(r=>(r.cardiacOncall||[]).includes(n)).length,called:yearRecs.filter(r=>(r.cardiacOncall||[]).includes(n)&&r.ocCardiac==='yes').length}]).filter(([,d])=>d.oncall>0);
+
+  c.innerHTML = `
+    <div class="insight-card">
+      <div class="ic-title">💡 ${annualYear}年 年次業務分析</div>
+      <div class="insight-list">
+        <div class="insight-item">
+          <div class="ii-label">年間業務件数 ${grand}件（1夜勤平均 ${avg}件）</div>
+          <div class="ii-body">${nights}夜勤 / 総件数 ${grand}件 / 平均 ${avg}件/夜勤</div>
+          <div class="ii-suggest">→ 業務件数 TOP3：${top3.map(([n,v],i)=>`${i+1}位 ${n}(${v}件)`).join('・')}</div>
+        </div>
+        <div class="insight-item ${assistCnt/nights>=0.5?'alert':assistCnt>0?'warn':'good'}">
+          <div class="ii-label">補助循環導入 年間 ${assistCnt}件（導入率 ${nights?Math.round(assistCnt/nights*100):0}%）</div>
+          <div class="ii-body">V-A/V-V ECMO・IABP・Impellaの開始・導入の年間合計。</div>
+          <div class="ii-suggest">→ ${assistCnt/nights>=0.5?'導入率が高水準。年間を通じた夜間体制強化の根拠として有効です。':assistCnt>0?'補助循環導入が発生しています。継続的な記録を続けてください。':'年間を通じて補助循環導入なし。'}</div>
+        </div>
+        <div class="insight-item ${emergCnt/nights>=0.5?'alert':emergCnt>0?'warn':'good'}">
+          <div class="ii-label">緊急カテーテル対応 年間 ${emergCnt}件（対応率 ${nights?Math.round(emergCnt/nights*100):0}%）</div>
+          <div class="ii-body">緊急CAG/PCI/EVT・心筋生検・心嚢穿刺の年間合計。</div>
+          <div class="ii-suggest">→ ${emergCnt>0?'年間の緊急カテ対応実績は夜間即応体制の根拠になります。':'年間を通じて緊急カテ対応なし。'}</div>
+        </div>
+        <div class="insight-item ${ocCallCnt/nights>=0.5?'alert':ocCallCnt>0?'warn':'good'}">
+          <div class="ii-label">オンコール呼び出し 年間 ${ocCallCnt}回（呼び出し率 ${nights?Math.round(ocCallCnt/nights*100):0}%）</div>
+          <div class="ii-body">オンコール外呼び出し ${ocExtCnt}回含む。${nights}夜勤中 ${ocCallCnt}回。</div>
+          <div class="ii-suggest">→ ${ocCallCnt/nights>=0.5?'年間を通じて高い呼び出し率。体制見直しの根拠として活用できます。':ocCallCnt>0?'呼び出し実績を継続記録することで体制改善の根拠になります。':'年間を通じてオンコール呼び出しなし。'}</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="insight-card">
+      <div class="ic-title">📊 月別業務件数推移 / 時間帯別分布</div>
+      <div class="report-charts-row">
+        <div class="report-chart-box" style="flex:2">
+          <div class="report-chart-title">月別業務件数推移</div>
+          <canvas id="annual-chart-monthly" style="width:100%;height:180px"></canvas>
+        </div>
+        <div class="report-chart-box" style="flex:1;min-width:160px">
+          <div class="report-chart-title">時間帯別業務分布（年間）</div>
+          <canvas id="annual-chart-slot" style="width:100%;height:180px"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <div class="insight-card">
+      <div class="ic-title">📊 補助循環・緊急カテ推移 / 業務ランキング</div>
+      <div class="report-chart-box" style="margin-bottom:12px">
+        <div class="report-chart-title">補助循環導入 / 緊急カテーテル対応　月別推移</div>
+        <canvas id="annual-chart-emerg" style="width:100%;height:180px"></canvas>
+      </div>
+      <div class="report-chart-box">
+        <div class="report-chart-title">業務件数 ランキング TOP10（年間）</div>
+        <canvas id="annual-chart-rank" style="width:100%;height:260px"></canvas>
+      </div>
+    </div>
+
+    <div class="insight-card">
+      <div class="ic-title">📊 OC呼び出し率推移 / 心外OC担当者別集計</div>
+      <div class="report-chart-box" style="margin-bottom:12px">
+        <div class="report-chart-title">OC呼び出し率　月別推移</div>
+        <canvas id="annual-chart-oc" style="width:100%;height:180px"></canvas>
+      </div>
+      <div class="report-chart-box">
+        <div class="report-chart-title">心外オンコール 担当者別集計（年間）</div>
+        <canvas id="annual-chart-cardiac" style="width:100%;height:${Math.max(120,cardiacEntries.length*44+30)}px"></canvas>
+      </div>
+    </div>`;
+
+  setTimeout(()=>{
+    const c1=document.getElementById('annual-chart-monthly'); if(c1){const{ctx,w,h}=initCanvas(c1);drawLineChart(ctx,w,h,monthLabels,monthGrands,'件','#3b82f6','業務件数');}
+    const c2=document.getElementById('annual-chart-slot'); if(c2){const{ctx,w,h}=initCanvas(c2);const tot=slots.early+slots.mid+slots.late;if(tot)drawPieChart(ctx,w,h,[{label:'準夜',value:slots.early,color:'#3b82f6'},{label:'深夜',value:slots.mid,color:'#7c3aed'},{label:'早朝',value:slots.late,color:'#06b6d4'}],tot);}
+    const c3=document.getElementById('annual-chart-emerg'); if(c3){const{ctx,w,h}=initCanvas(c3);drawMultiLineChart(ctx,w,h,monthLabels,[{label:'補助循環導入',values:monthAssist,color:'#dc2626'},{label:'緊急カテ対応',values:monthEmerg,color:'#06b6d4'}],'件');}
+    const c4=document.getElementById('annual-chart-rank'); if(c4){const{ctx,w,h}=initCanvas(c4);const top10=Object.entries(taskTot).sort((a,b)=>b[1]-a[1]).slice(0,10);if(top10.length)drawHBarChart(ctx,w,h,top10);}
+    const c5=document.getElementById('annual-chart-oc'); if(c5){const{ctx,w,h}=initCanvas(c5);drawLineChart(ctx,w,h,monthLabels,monthOCRate,'%','#ea580c','呼び出し率');}
+    const c6=document.getElementById('annual-chart-cardiac'); if(c6&&cardiacEntries.length){const{ctx,w,h}=initCanvas(c6);drawGroupedHBarChart(ctx,w,h,cardiacEntries);}
+  }, 100);
+}
+
+// 心外OC担当者グループ棒グラフ
+function drawGroupedHBarChart(ctx, w, h, entries) {
+  const labelW = Math.min(120, w*0.3);
+  const pad = {top:10, right:80, bottom:24, left:labelW};
+  const cw = w-pad.left-pad.right;
+  const rowH = Math.floor((h-pad.top-pad.bottom)/Math.max(entries.length,1));
+  const barH = Math.max(6, Math.floor(rowH*0.35));
+  const maxVal = Math.max(...entries.map(([,d])=>d.oncall),1);
+  ctx.clearRect(0,0,w,h);
+  entries.forEach(([name,d],i)=>{
+    const y = pad.top + i*rowH;
+    ctx.fillStyle='#1e293b'; ctx.font=`${Math.max(8,Math.min(11,labelW/10))}px sans-serif`; ctx.textAlign='right';
+    ctx.fillText(name.length>10?name.slice(0,9)+'…':name, pad.left-5, y+barH+3);
+    const bwO = Math.max(2,cw*(d.oncall/maxVal));
+    ctx.fillStyle='#06b6d4'; ctx.fillRect(pad.left,y,bwO,barH);
+    const bwC = d.called?Math.max(2,cw*(d.called/maxVal)):0;
+    ctx.fillStyle='#dc2626'; if(bwC) ctx.fillRect(pad.left,y+barH+2,bwC,barH);
+    ctx.fillStyle='#1e293b'; ctx.font='9px sans-serif'; ctx.textAlign='left';
+    ctx.fillText(`担当${d.oncall}回`, pad.left+bwO+3, y+barH-1);
+    if(d.called) ctx.fillText(`呼出${d.called}回(${Math.round(d.called/d.oncall*100)}%)`, pad.left+bwC+3, y+barH*2+3);
+  });
+  ctx.fillStyle='#06b6d4'; ctx.fillRect(pad.left,h-14,10,8);
+  ctx.fillStyle='#1e293b'; ctx.font='9px sans-serif'; ctx.textAlign='left'; ctx.fillText('担当回数',pad.left+14,h-7);
+  ctx.fillStyle='#dc2626'; ctx.fillRect(pad.left+70,h-14,10,8);
+  ctx.fillText('呼び出し回数',pad.left+84,h-7);
+}
+
+// ===================== 年次上申資料 =====================
+function renderAnnualReport() {
+  const c = document.getElementById('annual-report-content');
+  if (!c) return;
+  const allRecs = getRecords();
+  const yearRecs = allRecs.filter(r=>r.date&&r.date.startsWith(String(annualYear)));
+  if (!yearRecs.length) { c.innerHTML=`<div class="empty-state"><div class="ei">📅</div><p>${annualYear}年のデータはありません</p></div>`; return; }
+
+  const assistKw = ['V-A ECMO開始','V-V ECMO開始','IABP開始','Impella CP導入','Impella 5.5導入'];
+  const emergKw  = ['緊急カテーテル','心筋生検','心嚢穿刺'];
+  const taskTot  = {};
+  yearRecs.forEach(r=>{ Object.entries(r.tasks||{}).forEach(([n,v])=>taskTot[n]=(taskTot[n]||0)+v); (r.freeTasks||[]).forEach(ft=>{ if(ft.name) taskTot[ft.name]=(taskTot[ft.name]||0)+(ft.count||1); }); });
+  const grand=Object.values(taskTot).reduce((s,v)=>s+v,0), nights=yearRecs.length, avg=nights?(grand/nights).toFixed(1):0;
+  const assistCnt=Object.entries(taskTot).filter(([n])=>assistKw.some(k=>n.includes(k))).reduce((s,[,v])=>s+v,0);
+  const emergCnt =Object.entries(taskTot).filter(([n])=>emergKw.some(k=>n.includes(k))).reduce((s,[,v])=>s+v,0);
+  const pacingCnt=taskTot['体外式ペースメーカー挿入']||0;
+  const ocCallCnt=yearRecs.filter(r=>r.ocCall==='yes').length, ocExtCnt=yearRecs.filter(r=>r.ocExt==='yes').length, ocCardiacCnt=yearRecs.filter(r=>r.ocCardiac==='yes').length;
+  const slots={early:0,mid:0,late:0};
+  yearRecs.forEach(r=>{ if(r.taskSlots) Object.values(r.taskSlots).forEach(s=>{ slots.early+=s.early||0; slots.mid+=s.mid||0; slots.late+=s.late||0; }); });
+  const slotSum=slots.early+slots.mid+slots.late;
+  const top5=Object.entries(taskTot).sort((a,b)=>b[1]-a[1]).slice(0,5);
+  const peakDay=yearRecs.map(r=>({date:r.date,dow:['日','月','火','水','木','金','土'][new Date(r.date+'T00:00:00').getDay()],staff:(r.staff||[]).join('・'),total:Object.values(r.tasks||{}).reduce((s,v)=>s+v,0)+(r.freeTasks||[]).reduce((s,ft)=>s+(ft.count||1),0)})).sort((a,b)=>b.total-a.total).slice(0,3);
+  const extCallerMap={};
+  yearRecs.forEach(r=>{ if(r.ocExt==='yes')(r.extCallers||[]).forEach(s=>{ extCallerMap[s]=(extCallerMap[s]||0)+1; }); });
+  const cardiacReport=CARDIAC_ONCALL_STAFF.map(n=>({name:n,oncall:yearRecs.filter(r=>(r.cardiacOncall||[]).includes(n)).length,called:yearRecs.filter(r=>(r.cardiacOncall||[]).includes(n)&&r.ocCardiac==='yes').length})).filter(d=>d.oncall>0);
+  const months=[...Array(12)].map((_,i)=>String(annualYear)+'-'+String(i+1).padStart(2,'0'));
+  const monthLabels=months.map(m=>m.slice(5)+'月');
+  const monthGrands=months.map(m=>yearRecs.filter(r=>r.date.startsWith(m)).reduce((s,r)=>s+Object.values(r.tasks||{}).reduce((a,v)=>a+v,0)+(r.freeTasks||[]).reduce((a,ft)=>a+(ft.count||1),0),0));
+  const monthAssist=months.map(m=>{ const tt={}; yearRecs.filter(r=>r.date.startsWith(m)).forEach(r=>Object.entries(r.tasks||{}).forEach(([n,v])=>tt[n]=(tt[n]||0)+v)); return Object.entries(tt).filter(([n])=>assistKw.some(k=>n.includes(k))).reduce((s,[,v])=>s+v,0); });
+  const monthEmerg =months.map(m=>{ const tt={}; yearRecs.filter(r=>r.date.startsWith(m)).forEach(r=>Object.entries(r.tasks||{}).forEach(([n,v])=>tt[n]=(tt[n]||0)+v)); return Object.entries(tt).filter(([n])=>emergKw.some(k=>n.includes(k))).reduce((s,[,v])=>s+v,0); });
+  const monthOCRate=months.map(m=>{ const mr=yearRecs.filter(r=>r.date.startsWith(m)); return mr.length?Math.round(mr.filter(r=>r.ocCall==='yes').length/mr.length*100):0; });
+  const cardiacEntries=CARDIAC_ONCALL_STAFF.map(n=>[n,{oncall:yearRecs.filter(r=>(r.cardiacOncall||[]).includes(n)).length,called:yearRecs.filter(r=>(r.cardiacOncall||[]).includes(n)&&r.ocCardiac==='yes').length}]).filter(([,d])=>d.oncall>0);
+
+  const reportText=`━━━━━━━━━━━━━━━━━━━━━━━
+【夜勤業務実績報告】${annualYear}年度 年次
+━━━━━━━━━━━━━━━━━━━━━━━
+
+■ 業務集中日 TOP3
+${peakDay.map((d,i)=>`  ${i+1}位：${d.date.slice(5).replace('-','/')}（${d.dow}）${d.staff} ${d.total}件`).join('\n')}
+
+■ 年間業務実績
+・年間夜勤回数：${nights}回
+・年間総業務件数：${grand}件
+・1夜勤あたり平均：${avg}件
+
+■ 業務種別 上位5項目
+${top5.map(([n,v],i)=>`  ${i+1}位：${n}（${v}件）`).join('\n')}
+
+■ 時間帯別 業務発生状況
+${slotSum>0?`・準夜（16:30〜22:00）：${slots.early}件（${Math.round(slots.early/slotSum*100)}%）
+・深夜（22:00〜翌3:30）：${slots.mid}件（${Math.round(slots.mid/slotSum*100)}%）
+・早朝（翌3:30〜9:00）：${slots.late}件（${Math.round(slots.late/slotSum*100)}%）`:'・時間帯データ未記録'}
+
+■ 緊急・高難度対応（年間）
+・補助循環導入件数：${assistCnt}件（導入率 ${nights?Math.round(assistCnt/nights*100):0}%）
+  （V-A ECMO・V-V ECMO・IABP・Impella 開始・導入の合計）
+・緊急カテーテル対応件数：${emergCnt}件（対応率 ${nights?Math.round(emergCnt/nights*100):0}%）
+  （緊急CAG/PCI/EVT・心筋生検・心嚢穿刺の合計）
+・体外式ペースメーカー挿入：${pacingCnt}件（別集計）
+
+■ オンコール状況（年間）
+・オンコール担当呼び出し：${ocCallCnt}回（呼び出し率 ${nights?Math.round(ocCallCnt/nights*100):0}%）
+・オンコール外呼び出し：${ocExtCnt}回
+${Object.entries(extCallerMap).length?`  【呼び出されたスタッフ】\n${Object.entries(extCallerMap).sort((a,b)=>b[1]-a[1]).map(([n,v])=>`    ${n}：${v}回`).join('\n')}`:'  （外呼び出しなし）'}
+・心外オンコール呼び出し：${ocCardiacCnt}回
+
+■ 心外オンコール 担当者別集計（年間）
+${cardiacReport.length?cardiacReport.map(d=>`・${d.name}：担当${d.oncall}回 / 呼び出し${d.called}回（呼び出し率${d.oncall?Math.round(d.called/d.oncall*100):0}%）`).join('\n'):'・データなし'}
+
+■ 所見・課題
+${assistCnt/nights>=0.5?`・補助循環導入率が${Math.round(assistCnt/nights*100)}%と高水準。年間を通じた夜間体制の強化・増員を要する。`:''}
+${emergCnt>nights?'・緊急カテーテル対応が1夜勤あたり1件超。夜間の即応体制・人員確保の強化が必要。':''}
+${ocExtCnt>0?`・年間${ocExtCnt}回のオンコール外呼び出しが発生。即応体制の整備が必要。`:''}
+${slots.mid>slots.early&&slots.mid>slots.late?'・深夜帯への業務集中が顕著。仮眠確保・夜間応援体制の整備が望まれる。':''}
+
+━━━━━━━━━━━━━━━━━━━━━━━
+作成日：${new Date().toLocaleDateString('ja-JP')}
+CE夜勤業務集計システム
+━━━━━━━━━━━━━━━━━━━━━━━`;
+
+  c.innerHTML=`
+    <div id="annual-report-print-area">
+      <div class="report-page">
+        <div class="report-page-header">
+          <div class="report-page-title">夜勤業務実績報告　${annualYear}年度 年次</div>
+          <div class="report-page-sub">関東労災病院　臨床工学部　CE夜勤業務集計システム</div>
+        </div>
+        <div class="report-text-editable" id="annual-report-text-area" contenteditable="true">${reportText.replace(/\n/g,'<br>').replace(/ /g,'&nbsp;')}</div>
+        <div class="report-charts-row">
+          <div class="report-chart-box" style="flex:2"><div class="report-chart-title">月別業務件数推移</div><canvas id="ar-chart-monthly" style="width:100%;height:180px"></canvas></div>
+          <div class="report-chart-box" style="flex:1;min-width:160px"><div class="report-chart-title">時間帯別業務分布（年間）</div><canvas id="ar-chart-slot" style="width:100%;height:180px"></canvas></div>
+        </div>
+      </div>
+      <div class="report-page" style="page-break-before:always">
+        <div class="report-page-header">
+          <div class="report-page-title">夜勤業務実績報告　${annualYear}年度（詳細①）</div>
+          <div class="report-page-sub">関東労災病院　臨床工学部　CE夜勤業務集計システム</div>
+        </div>
+        <div class="report-chart-box" style="margin-bottom:12px"><div class="report-chart-title">補助循環導入 / 緊急カテーテル対応　月別推移</div><canvas id="ar-chart-emerg" style="width:100%;height:180px"></canvas></div>
+        <div class="report-chart-box"><div class="report-chart-title">業務件数 ランキング TOP10（年間）</div><canvas id="ar-chart-rank" style="width:100%;height:260px"></canvas></div>
+      </div>
+      <div class="report-page" style="page-break-before:always">
+        <div class="report-page-header">
+          <div class="report-page-title">夜勤業務実績報告　${annualYear}年度（詳細②）</div>
+          <div class="report-page-sub">関東労災病院　臨床工学部　CE夜勤業務集計システム</div>
+        </div>
+        <div class="report-chart-box" style="margin-bottom:12px"><div class="report-chart-title">OC呼び出し率　月別推移</div><canvas id="ar-chart-oc" style="width:100%;height:180px"></canvas></div>
+        <div class="report-chart-box" style="margin-bottom:12px"><div class="report-chart-title">心外オンコール 担当者別集計（年間）</div><canvas id="ar-chart-cardiac" style="width:100%;height:${Math.max(120,cardiacEntries.length*44+30)}px"></canvas></div>
+        <div style="margin-top:12px"><div class="report-chart-title">所見・追記</div>
+          <div contenteditable="true" id="annual-report-extra" style="min-height:80px;border:1px solid #e2e8f0;border-radius:8px;padding:10px;font-size:11px;line-height:1.8;color:#1e293b;background:#f8fafc"></div>
+        </div>
+      </div>
+    </div>
+    <div class="report-actions no-print">
+      <button class="copy-report-btn" onclick="copyAnnualReport()">📋 テキストをコピー</button>
+      <button class="copy-report-btn" style="background:var(--green)" onclick="window.print()">🖨️ PDF出力（印刷）</button>
+    </div>`;
+
+  window._annualReportText = reportText;
+  setTimeout(()=>{
+    const c1=document.getElementById('ar-chart-monthly'); if(c1){const{ctx,w,h}=initCanvas(c1);drawLineChart(ctx,w,h,monthLabels,monthGrands,'件','#3b82f6','業務件数');}
+    const c2=document.getElementById('ar-chart-slot'); if(c2){const{ctx,w,h}=initCanvas(c2);const tot=slots.early+slots.mid+slots.late;if(tot)drawPieChart(ctx,w,h,[{label:'準夜',value:slots.early,color:'#3b82f6'},{label:'深夜',value:slots.mid,color:'#7c3aed'},{label:'早朝',value:slots.late,color:'#06b6d4'}],tot);}
+    const c3=document.getElementById('ar-chart-emerg'); if(c3){const{ctx,w,h}=initCanvas(c3);drawMultiLineChart(ctx,w,h,monthLabels,[{label:'補助循環導入',values:monthAssist,color:'#dc2626'},{label:'緊急カテ対応',values:monthEmerg,color:'#06b6d4'}],'件');}
+    const c4=document.getElementById('ar-chart-rank'); if(c4){const{ctx,w,h}=initCanvas(c4);const top10=Object.entries(taskTot).sort((a,b)=>b[1]-a[1]).slice(0,10);if(top10.length)drawHBarChart(ctx,w,h,top10);}
+    const c5=document.getElementById('ar-chart-oc'); if(c5){const{ctx,w,h}=initCanvas(c5);drawLineChart(ctx,w,h,monthLabels,monthOCRate,'%','#ea580c','呼び出し率');}
+    const c6=document.getElementById('ar-chart-cardiac'); if(c6&&cardiacEntries.length){const{ctx,w,h}=initCanvas(c6);drawGroupedHBarChart(ctx,w,h,cardiacEntries);}
+  },100);
+}
+
+function copyAnnualReport() {
+  const mainText=document.getElementById('annual-report-text-area')?.innerText||window._annualReportText||'';
+  const extra=document.getElementById('annual-report-extra')?.innerText?.trim();
+  const full=extra?mainText+'\n\n■ 追記\n'+extra:mainText;
+  navigator.clipboard.writeText(full).then(()=>showToast('📋 クリップボードにコピーしました')).catch(()=>{
+    const ta=document.createElement('textarea');ta.value=full;document.body.appendChild(ta);ta.select();document.execCommand('copy');document.body.removeChild(ta);showToast('📋 コピーしました');
+  });
 }
 
 // 月カードをタップすると月次集計に飛ぶ
