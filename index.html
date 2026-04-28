@@ -425,9 +425,10 @@ textarea { height: 76px; resize: vertical; font-size: 13px; line-height: 1.6; }
   margin-bottom: 8px;
 }
 .report-actions {
-  display: flex;
-  gap: 8px;
-  margin-top: 12px;
+  display: grid;
+  grid-template-columns: 1fr 2fr;
+  gap: 10px;
+  margin-top: 16px;
   margin-bottom: 20px;
 }
 
@@ -453,8 +454,11 @@ textarea { height: 76px; resize: vertical; font-size: 13px; line-height: 1.6; }
 .report-section { background: #fff; border: 1.5px solid var(--border); border-radius: var(--radius); padding: 16px; margin-bottom: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.04); }
 .report-section h3 { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 14px; font-weight: 800; }
 .report-preview { background: var(--surface2); border: 1.5px solid var(--border); border-radius: 9px; padding: 14px; margin-bottom: 12px; font-size: 12px; line-height: 1.9; color: var(--text-muted); white-space: pre-wrap; max-height: 320px; overflow-y: auto; font-family: 'Noto Sans JP', sans-serif; }
-.copy-report-btn { width: 100%; padding: 12px; background: var(--surface2); border: 1.5px solid var(--border); border-radius: 10px; color: var(--text-muted); font-family: 'Noto Sans JP', sans-serif; font-size: 13px; font-weight: 700; cursor: pointer; transition: all 0.2s; }
-.copy-report-btn:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-dim); }
+.copy-report-btn { width: 100%; padding: 13px 10px; background: var(--surface2); border: 1.5px solid var(--border); border-radius: 12px; color: var(--text-muted); font-family: 'Noto Sans JP', sans-serif; font-size: 13px; font-weight: 700; cursor: pointer; transition: all 0.18s; letter-spacing: 0.03em; }
+.copy-report-btn:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-dim); transform: translateY(-1px); }
+.copy-report-btn.pdf-btn { background: linear-gradient(135deg, #16a34a 0%, #059669 100%); border: none; color: #fff; font-size: 14px; border-radius: 12px; box-shadow: 0 4px 14px rgba(22,163,74,0.35); letter-spacing: 0.04em; }
+.copy-report-btn.pdf-btn:hover { background: linear-gradient(135deg, #15803d 0%, #047857 100%); box-shadow: 0 6px 18px rgba(22,163,74,0.45); transform: translateY(-2px); color: #fff; }
+.copy-report-btn.pdf-btn:active { transform: translateY(0); box-shadow: 0 2px 8px rgba(22,163,74,0.3); }
 
 /* ===== グラフ ===== */
 .chart-sec { background: #fff; border: 1.5px solid var(--border); border-radius: var(--radius); padding: 16px; margin-bottom: 10px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.04); }
@@ -725,6 +729,10 @@ textarea { height: 76px; resize: vertical; font-size: 13px; line-height: 1.6; }
     </div>
     <div class="settings-row">
       <button class="sync-btn resync" id="restore-sheet-btn" onclick="restoreFromSheet()">☁️ スプレッドシートからアプリに復元</button>
+    </div>
+    <div class="settings-row">
+      <button class="sync-btn" id="resync-all-btn" onclick="resyncAllToSheet()" style="background:var(--orange)">🔁 全データをスプレッドシートに再送信</button>
+      <div class="settings-help" style="margin-top:6px">⚠️ 業務タスクの項目追加・変更後にスプレッドシートの列が合わなくなった場合に使います。ローカルの全記録を一括でスプレッドシートに送信し直します。</div>
       <div class="settings-help" style="margin-top:6px">
         ⚠️ iPhoneを機種変更・初期化した後や、アプリのデータが消えたときに使います。スプレッドシートの全データをアプリに読み込み直します。既存のローカルデータとマージされます（重複は新しい方優先）。
       </div>
@@ -976,7 +984,32 @@ function renderStaff() {
 
 function renderOncall() {
   const g = document.getElementById('oncall-grid');
-  renderGroupedChips(g, selOncall, (n, el, color) => {
+  g.innerHTML = '';
+
+  // 「なし」チップを先頭に追加（2人夜勤用）
+  const noneChip = document.createElement('div');
+  const noneSelected = selOncall.has('なし');
+  noneChip.className = 's-chip' + (noneSelected ? ' sel' : '');
+  noneChip.style.cssText = noneSelected
+    ? 'background:#64748b18;border-color:#64748b;color:#64748b;font-weight:700;margin-bottom:8px'
+    : 'margin-bottom:8px';
+  noneChip.textContent = 'なし（2人夜勤）';
+  noneChip.onclick = () => {
+    if (selOncall.has('なし')) {
+      selOncall.delete('なし');
+    } else {
+      selOncall.clear(); // 他の選択を解除
+      selOncall.add('なし');
+    }
+    renderOncall();
+    updateProg();
+  };
+  g.appendChild(noneChip);
+
+  // 通常のスタッフグループ
+  const wrap = document.createElement('div');
+  wrap.style.cssText = noneSelected ? 'opacity:0.4;pointer-events:none' : '';
+  renderGroupedChips(wrap, selOncall, (n, el, color) => {
     selOncall.has(n) ? selOncall.delete(n) : selOncall.add(n);
     if (selOncall.has(n)) {
       el.className = 's-chip sel';
@@ -986,6 +1019,7 @@ function renderOncall() {
       el.style.cssText = '';
     }
   }, '');
+  g.appendChild(wrap);
 }
 
 function renderCardiacOncall() {
@@ -2531,7 +2565,8 @@ function checkAndSave() {
   checks.push({ ok: !!date, label: '夜勤日付' });
   checks.push({ ok: selStaff.size > 0, label: '夜勤者' });
   checks.push({ ok: selOncall.size > 0, label: 'オンコール担当者' });
-  checks.push({ ok: ocCall !== null, label: 'オンコール呼び出しの有無' });
+  const isTwoPersonShift = selOncall.has('なし');
+  checks.push({ ok: isTwoPersonShift || ocCall !== null, label: 'オンコール呼び出しの有無' });
   checks.push({ ok: ocExt !== null, label: 'オンコール外呼び出しの有無' });
   checks.push({ ok: Object.values(taskCounts).some(v=>v>0) || freeTasks.some(ft=>ft.name.trim()), label: '業務内容（1件以上）' });
 
@@ -3008,8 +3043,8 @@ CE夜勤業務集計システム
       </div>
     </div>
     <div class="report-actions no-print">
-      <button class="copy-report-btn" onclick="copyAnnualReport()">📋 テキストをコピー</button>
-      <button class="copy-report-btn" style="background:var(--green)" onclick="printAnnualReport()">🖨️ PDF出力（印刷）</button>
+      <button class="copy-report-btn" onclick="copyAnnualReport()">📋 コピー</button>
+      <button class="copy-report-btn pdf-btn" onclick="printAnnualReport()">🖨️ PDF出力（印刷）</button>
     </div>`;
 
   window._annualReportText = reportText;
@@ -3426,8 +3461,8 @@ CE夜勤業務集計システム
 
     <!-- ボタン群（印刷時は非表示） -->
     <div class="report-actions no-print">
-      <button class="copy-report-btn" onclick="copyReport()">📋 テキストをコピー</button>
-      <button class="copy-report-btn" style="background:var(--green)" onclick="printReport()">🖨️ PDF出力（印刷）</button>
+      <button class="copy-report-btn" onclick="copyReport()">📋 コピー</button>
+      <button class="copy-report-btn pdf-btn" onclick="printReport()">🖨️ PDF出力（印刷）</button>
     </div>`;
 
   // グラフ描画（レイアウト完了後に実行）
@@ -4182,6 +4217,45 @@ async function resyncOne(date, e) {
   const result = await syncRecord(rec);
   if (result.ok) { showToast('✅ 送信しました'); renderHistory(); }
   else showToast('❌ 送信失敗: '+result.error, '#ff6b6b');
+}
+
+// ===================== 全データ再送信 =====================
+async function resyncAllToSheet() {
+  const url = getGasUrl();
+  if (!url) { showToast('⚠ URLを設定してください','#ff9944'); return; }
+
+  const recs = getRecords();
+  if (!recs.length) { showToast('⚠ 送信するデータがありません','#ff9944'); return; }
+
+  if (!confirm(`ローカルの全${recs.length}件をスプレッドシートに再送信します。\n既存のスプレッドシートのデータは上書きされます。\n\nよろしいですか？`)) return;
+
+  const btn = document.getElementById('resync-all-btn');
+  btn.disabled = true;
+
+  let success = 0, failed = 0;
+  for (let i = 0; i < recs.length; i++) {
+    btn.innerHTML = `<span class="spinning">⟳</span> 再送信中... ${i+1}/${recs.length}`;
+    const result = await syncRecord(recs[i]);
+    if (result.ok) {
+      success++;
+      // syncStatusをdoneに更新
+      recs[i].syncStatus = 'done';
+      recs[i].syncedAt = new Date().toISOString();
+    } else {
+      failed++;
+    }
+  }
+
+  // ローカルのsyncStatusも更新
+  localStorage.setItem('ce_v3', JSON.stringify(recs));
+
+  btn.disabled = false;
+  btn.innerHTML = '🔁 全データをスプレッドシートに再送信';
+  updateSyncStatus();
+  renderHistory();
+
+  if (failed === 0) showToast(`✅ 全${success}件の再送信が完了しました`);
+  else showToast(`⚠ 成功${success} / 失敗${failed}`, '#ff9944');
 }
 
 // ===================== スプレッドシートからの復元 =====================
