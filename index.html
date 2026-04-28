@@ -3359,7 +3359,7 @@ async function printAnnualReport() {
     const sectionHeader = (title, fy, bg='#1a2230') => {
       const safeY = (isFinite(fy)&&fy>0) ? fy : y;
       setFill(bg); pdf.setLineWidth(0); pdf.rect(M,safeY,CW,7,'F');
-      jpText(title,M+3,safeY+1.5,9,'#ffffff'); return safeY+8;
+      jpText(title,M+3,safeY+2,11,'#ffffff'); return safeY+9;
     };
 
     const barRow = (label, val, maxVal, fy, barColor='#3b82f6', rowH=5.5) => {
@@ -3443,7 +3443,7 @@ async function printAnnualReport() {
     setFill('#1a2230'); pdf.rect(annCol2X,y,annColW,7,'F');
     jpText('■ スタッフ別 TOP5',annCol2X+3,y+1.5,8,'#ffffff');
     y+=9;
-    const annRankRowH=6;
+    const annRankRowH=5;
     const annStartY=y;
     peakDays.forEach((d,i)=>{
       const rc=annRankColors[i];
@@ -3451,7 +3451,7 @@ async function printAnnualReport() {
       jpText(`${d.date.slice(5).replace('-','/')}（${d.dow}）`,M+9,y,7.5,'#1e293b');
       jpText(d.staff.length>8?d.staff.slice(0,7)+'…':d.staff,M+9,y+4,6.5,'#64748b');
       jpText(`${d.total}件`,M+annColW,y+1,8,'#3b82f6','right');
-      hLine(y+annRankRowH*1.8,'#e2e8f0',0.15); y+=annRankRowH*1.9;
+      hLine(y+annRankRowH*1.6,'#e2e8f0',0.15); y+=annRankRowH*1.7;
     });
     y=annStartY;
     annStaffTop5.forEach((d,i)=>{
@@ -3460,13 +3460,13 @@ async function printAnnualReport() {
       jpText(d.name.length>7?d.name.slice(0,6)+'…':d.name,annCol2X+9,y,7.5,'#1e293b');
       jpText(`${d.nights}夜勤 avg${d.avg}件`,annCol2X+9,y+4,6,'#64748b');
       jpText(`${d.total}件`,annCol2X+annColW,y+1,8,'#3b82f6','right');
-      hLine(y+annRankRowH*1.8,'#e2e8f0',0.15); y+=annRankRowH*1.9;
+      hLine(y+annRankRowH*1.6,'#e2e8f0',0.15); y+=annRankRowH*1.7;
     });
-    y+=4; nl(2);
+    y+=2; nl(1);
 
     y=sectionHeader('■ 業務種別 上位5項目（年間）',y); nl(2);
     const maxT5=top5.length?top5[0][1]:1;
-    top5.forEach(([name,val])=>{y=barRow(name,val,maxT5,y,'#3b82f6');}); nl(3);
+    top5.forEach(([name,val])=>{y=barRow(name,val,maxT5,y,'#3b82f6');}); nl(1);
 
     y=sectionHeader('■ 時間帯別業務分布（年間累計）',y); nl(2);
     if(slotSum>0){
@@ -3475,23 +3475,23 @@ async function printAnnualReport() {
         jpText(l,M,y,8,'#1e293b'); setFill(c); if(bw>0&&isFinite(bw)) pdf.rect(M+60,y+0.5,bw,4,'F');
         jpText(`${v}件(${pct}%)`,M+CW,y,8,'#64748b','right'); hLine(y+5.5,'#e2e8f0',0.2); y+=6;
       });
-    } nl(3);
+    } nl(1);
 
     y=sectionHeader('■ 今年の特記業務（年間）',y,'#dc2626'); nl(2);
     buildSpecialReport(taskTot, nights, 'annual').split('\n').forEach(line=>{
       const isDetail = line.startsWith('　');
       jpText(line.trimStart(), M+(isDetail?8:2), y, isDetail?7.5:8, isDetail?'#64748b':'#dc2626');
-      y += isDetail?4.5:5;
-    }); nl(2);
+      y += isDetail?4:4.5;
+    }); nl(1);
 
     y=sectionHeader('■ オンコール状況（年間）',y); nl(2);
     jpText(`OC担当呼び出し：${ocCall}回（呼び出し率 ${nights?Math.round(ocCall/nights*100):0}%）`,M+2,y,8,'#1e293b'); y+=5;
     jpText(`OC外呼び出し：${ocExt}回${Object.keys(extCallerMap).length?'　'+Object.entries(extCallerMap).map(([n,v])=>`${n}:${v}回`).join('・'):''}`,M+2,y,8,'#1e293b'); y+=5;
-    jpText(`心外OC呼び出し：${ocCardiacCnt}回`,M+2,y,8,'#1e293b'); y+=5; nl(2);
+    jpText(`心外OC呼び出し：${ocCardiacCnt}回`,M+2,y,8,'#1e293b'); y+=5; nl(1);
 
     if(cardiacReport.length){
       y=sectionHeader('■ 心外オンコール 担当者別集計（年間）',y); nl(2);
-      cardiacReport.forEach(d=>{const rate=d.oncall?Math.round(d.called/d.oncall*100):0;jpText(`${d.name}：担当${d.oncall}回 / 呼び出し${d.called}回（${rate}%）`,M+2,y,8,'#1e293b');y+=5;}); nl(2);
+      cardiacReport.forEach(d=>{const rate=d.oncall?Math.round(d.called/d.oncall*100):0;jpText(`${d.name}：担当${d.oncall}回 / 呼び出し${d.called}回（${rate}%）`,M+2,y,8,'#1e293b');y+=5;}); nl(1);
     }
 
     y=sectionHeader('■ 所見・課題',y,'#dc2626'); nl(2);
@@ -4195,11 +4195,10 @@ async function printReport() {
 
     const sectionHeader = (title, fy, bg='#1a2230') => {
       const safeY = (isFinite(fy)&&fy>0) ? fy : y;
-      checkPage(12);
       setFill(bg); pdf.setLineWidth(0);
       pdf.rect(M, safeY, CW, 7, 'F');
-      jpText(title, M+3, safeY+1.5, 9, '#ffffff');
-      return safeY + 8;
+      jpText(title, M+3, safeY+2, 11, '#ffffff');
+      return safeY + 9;
     };
 
     const kpiCards = (items, fy, cardH=14) => {
@@ -4222,7 +4221,6 @@ async function printReport() {
     };
 
     const barRow = (label, val, maxVal, fy, barColor='#3b82f6', rowH=5.5) => {
-      checkPage(rowH + 2);
       const short = label.length > 25 ? label.slice(0,24)+'…' : label;
       jpText(short, M, fy, 7.5, '#1e293b');
       const barW = maxVal>0&&isFinite(val)?Math.min(CW-50,Math.max(1,(CW-50)*val/maxVal)):1;
@@ -4322,7 +4320,7 @@ async function printReport() {
     jpText('■ スタッフ別 TOP5', col2X+3, y+1.5, 8, '#ffffff');
     y += 9;
 
-    const rankRowH = 6;
+    const rankRowH = 5;
     const startY = y;
     // 左カラム：日付別
     peakDays.forEach((d,i) => {
@@ -4331,8 +4329,8 @@ async function printReport() {
       jpText(`${d.date.slice(5).replace('-','/')}（${d.dow}）`, M+9, y, 7.5, '#1e293b');
       jpText(d.staff.length>8?d.staff.slice(0,7)+'…':d.staff, M+9, y+4, 6.5, '#64748b');
       jpText(`${d.total}件`, M+colW, y+1, 8, '#3b82f6', 'right');
-      hLine(y+rankRowH*1.8, '#e2e8f0', 0.15);
-      y += rankRowH * 1.9;
+      hLine(y+rankRowH*1.6, '#e2e8f0', 0.15);
+      y += rankRowH * 1.7;
     });
 
     // 右カラム：スタッフ別
@@ -4343,17 +4341,17 @@ async function printReport() {
       jpText(d.name.length>7?d.name.slice(0,6)+'…':d.name, col2X+9, y, 7.5, '#1e293b');
       jpText(`${d.nights}夜勤 avg${d.avg}件`, col2X+9, y+4, 6, '#64748b');
       jpText(`${d.total}件`, col2X+colW, y+1, 8, '#3b82f6', 'right');
-      hLine(y+rankRowH*1.8, '#e2e8f0', 0.15);
-      y += rankRowH * 1.9;
+      hLine(y+rankRowH*1.6, '#e2e8f0', 0.15);
+      y += rankRowH * 1.7;
     });
 
-    y += 4;
-    nl(2);
+    y += 2;
+    nl(1);
 
     // 業務種別TOP5
     y = sectionHeader('■ 業務種別 上位5項目', y); nl(2);
     const maxTop5 = top5.length ? top5[0][1] : 1;
-    top5.forEach(([name,val]) => { y = barRow(name, val, maxTop5, y, '#3b82f6'); }); nl(3);
+    top5.forEach(([name,val]) => { y = barRow(name, val, maxTop5, y, '#3b82f6'); }); nl(1);
 
     // 時間帯別
     y = sectionHeader('■ 時間帯別 業務発生状況', y); nl(2);
@@ -4369,7 +4367,7 @@ async function printReport() {
     } else {
       jpText('時間帯データ未記録', M+2, y, 8, '#94a3b8'); y += 6;
     }
-    nl(3);
+    nl(1);
 
     // 今月の特記業務
     y = sectionHeader('■ 今月の特記業務', y, '#dc2626'); nl(2);
@@ -4377,15 +4375,15 @@ async function printReport() {
     specialLines.forEach(line => {
       const isDetail = line.startsWith('　');
       jpText(line.trimStart(), M + (isDetail ? 8 : 2), y, isDetail ? 7.5 : 8, isDetail ? '#64748b' : '#dc2626');
-      y += isDetail ? 4.5 : 5;
+      y += isDetail ? 4 : 4.5;
     });
-    nl(2);
+    nl(1);
 
     // OC状況
     y = sectionHeader('■ オンコール状況', y); nl(2);
     jpText(`OC担当呼び出し：${ocCall}回（呼び出し率 ${ocRate}%）`, M+2, y, 8, '#1e293b'); y += 5;
     jpText(`OC外呼び出し：${ocExt}回${Object.keys(extCallerMap).length?'　'+Object.entries(extCallerMap).map(([n,v])=>`${n}:${v}回`).join('・'):''}`, M+2, y, 8, '#1e293b'); y += 5;
-    jpText(`心外OC呼び出し：${ocCardiacCnt}回`, M+2, y, 8, '#1e293b'); y += 5; nl(2);
+    jpText(`心外OC呼び出し：${ocCardiacCnt}回`, M+2, y, 8, '#1e293b'); y += 5; nl(1);
 
     // 心外OC担当者
     if (cardiacReport.length) {
@@ -4393,7 +4391,7 @@ async function printReport() {
       cardiacReport.forEach(d => {
         const rate = d.oncall ? Math.round(d.called/d.oncall*100) : 0;
         jpText(`${d.name}：担当${d.oncall}回 / 呼び出し${d.called}回（${rate}%）`, M+2, y, 8, '#1e293b'); y += 5;
-      }); nl(2);
+      }); nl(1);
     }
 
     // 所見
