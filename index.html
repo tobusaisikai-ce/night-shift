@@ -1291,30 +1291,35 @@ function renderFree() {
     if (!ft.slots) ft.slots = {early:0,mid:0,late:0};
     const row = document.createElement('div');
     row.className = 'free-row';
-    row.style.cssText = 'flex-direction:column;gap:6px;padding:10px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;margin-bottom:6px';
-    row.innerHTML = `
-      <div style="display:flex;gap:6px;align-items:center">
-        <input type="text" placeholder="業務名・対応内容" value="${ft.name}" oninput="freeTasks[${i}].name=this.value" style="flex:1">
-        <input type="number" class="free-cnt" min="1" value="${ft.count}" oninput="freeTasks[${i}].count=parseInt(this.value)||1" style="width:56px">
-        <button class="rm-btn" onclick="freeTasks.splice(${i},1);renderFree()">×</button>
+    row.style.cssText = 'flex-direction:column;gap:8px;padding:10px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;margin-bottom:8px';
+    // 上段：業務名・件数・削除
+    const topDiv = document.createElement('div');
+    topDiv.style.cssText = 'display:flex;align-items:center;gap:8px';
+    topDiv.innerHTML = `
+      <input type="text" placeholder="業務名・対応内容" value="${ft.name}" oninput="freeTasks[${i}].name=this.value" style="flex:1;font-size:14px">
+      <div style="display:flex;align-items:center;gap:4px;flex-shrink:0">
+        <span style="font-size:10px;color:var(--text-dim)">合計</span>
+        <span style="font-size:16px;font-weight:700;min-width:24px;text-align:right;color:${ft.count>0?'var(--accent)':'var(--text-dim)'}">${ft.count}</span>
       </div>
-      <div style="display:flex;gap:6px">
-        <div style="font-size:10px;color:var(--text-dim);align-self:center;width:48px">時間帯</div>
-        <div style="display:flex;gap:4px;flex:1">
-          ${['early','mid','late'].map((s,si)=>{
-            const labels=['準夜','深夜','早朝'];
-            const val = ft.slots[s]||0;
-            return `<div style="flex:1;text-align:center">
-              <div style="font-size:9px;color:var(--text-dim);margin-bottom:3px">${labels[si]}</div>
-              <div style="display:flex;align-items:center;justify-content:center;gap:3px">
-                <button onclick="freeSlotChange(${i},'${s}',-1)" style="width:32px;height:32px;border:1px solid var(--border);border-radius:6px;background:var(--surface);font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center">−</button>
-                <span style="font-size:14px;font-weight:700;min-width:20px;text-align:center">${val}</span>
-                <button onclick="freeSlotChange(${i},'${s}',1)" style="width:32px;height:32px;border:1px solid var(--border);border-radius:6px;background:var(--surface);font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center">＋</button>
-              </div>
-            </div>`;
-          }).join('')}
-        </div>
-      </div>`;
+      <button class="rm-btn" onclick="freeTasks.splice(${i},1);renderFree()">×</button>`;
+    row.appendChild(topDiv);
+    // 下段：時間帯スロット（通常タスクと同じデザイン）
+    const slotsDiv = document.createElement('div');
+    slotsDiv.className = 'slot-counters';
+    TIME_SLOTS.forEach(ts => {
+      const val = ft.slots[ts.key]||0;
+      const slotEl = document.createElement('div');
+      slotEl.className = 'slot-counter' + (val>0?' active':'');
+      slotEl.innerHTML = `
+        <div class="slot-label">${ts.short}</div>
+        <div class="slot-controls">
+          <button class="slot-btn minus" onclick="freeSlotChange(${i},'${ts.key}',-1)">−</button>
+          <span class="slot-val">${val}</span>
+          <button class="slot-btn plus" onclick="freeSlotChange(${i},'${ts.key}',1)">＋</button>
+        </div>`;
+      slotsDiv.appendChild(slotEl);
+    });
+    row.appendChild(slotsDiv);
     c.appendChild(row);
   });
 }
@@ -1322,9 +1327,7 @@ function renderFree() {
 function freeSlotChange(i, slot, delta) {
   if (!freeTasks[i].slots) freeTasks[i].slots = {early:0,mid:0,late:0};
   freeTasks[i].slots[slot] = Math.max(0, (freeTasks[i].slots[slot]||0) + delta);
-  // 合計件数も自動更新
-  const total = Object.values(freeTasks[i].slots).reduce((s,v)=>s+v,0);
-  if (total > 0) freeTasks[i].count = total;
+  freeTasks[i].count = Object.values(freeTasks[i].slots).reduce((s,v)=>s+v,0) || 1;
   renderFree();
 }
 
