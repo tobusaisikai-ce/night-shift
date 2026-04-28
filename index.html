@@ -3264,8 +3264,7 @@ CE夜勤業務集計システム
       <div class="report-page">
         <div class="report-page-header">
           <div class="report-page-title">夜勤業務実績報告　${annualYear}年度</div>
-          <div class="report-page-sub">臨床工学部　CE夜勤業務集計システム</div>
-        </div>
+                  </div>
         <div class="report-text-editable" id="annual-report-text-area" contenteditable="true">${reportText.replace(/\n/g,'<br>').replace(/ /g,'&nbsp;')}</div>
         <div class="report-chart-box" style="margin-bottom:12px">
           <div class="report-chart-title">月別業務件数推移</div>
@@ -3279,8 +3278,7 @@ CE夜勤業務集計システム
       <div class="report-page" style="page-break-before:always">
         <div class="report-page-header">
           <div class="report-page-title">夜勤業務実績報告　${annualYear}年度（詳細①）</div>
-          <div class="report-page-sub">臨床工学部　CE夜勤業務集計システム</div>
-        </div>
+                  </div>
         <div class="report-chart-box" style="margin-bottom:12px">
           <div class="report-chart-title">補助循環導入 / 緊急カテーテル対応　月別推移</div>
           <canvas id="ar-chart-emerg" style="width:100%;height:200px"></canvas>
@@ -3293,8 +3291,7 @@ CE夜勤業務集計システム
       <div class="report-page" style="page-break-before:always">
         <div class="report-page-header">
           <div class="report-page-title">夜勤業務実績報告　${annualYear}年度（詳細②）</div>
-          <div class="report-page-sub">臨床工学部　CE夜勤業務集計システム</div>
-        </div>
+                  </div>
         <div class="report-chart-box" style="margin-bottom:12px"><div class="report-chart-title">OC呼び出し率　月別推移</div><canvas id="ar-chart-oc" style="width:100%;height:180px"></canvas></div>
         <div class="report-chart-box" style="margin-bottom:12px"><div class="report-chart-title">心外オンコール 担当者別集計（年間）</div><canvas id="ar-chart-cardiac" style="width:100%;height:${Math.max(120,cardiacEntries.length*44+30)}px"></canvas></div>
         <div style="margin-top:12px"><div class="report-chart-title">所見・追記</div>
@@ -3359,7 +3356,7 @@ async function printAnnualReport() {
     const sectionHeader = (title, fy, bg='#1a2230') => {
       const safeY = (isFinite(fy)&&fy>0) ? fy : y;
       setFill(bg); pdf.setLineWidth(0); pdf.rect(M,safeY,CW,7,'F');
-      jpText(title,M+3,safeY+2,11,'#ffffff'); return safeY+9;
+      jpText(title,M+3,safeY+3.5,11,'#ffffff'); return safeY+9;
     };
 
     const barRow = (label, val, maxVal, fy, barColor='#3b82f6', rowH=5.5) => {
@@ -3424,7 +3421,6 @@ async function printAnnualReport() {
 
     // ===== 1ページ =====
     jpText(`夜勤業務実績報告　${annualYear}年度`,M,y,15,'#1a2230'); y+=8;
-    jpText('臨床工学部　CE夜勤業務集計システム',M,y,8,'#64748b'); y+=3;
     hLine(y,'#1a2230',1); y+=5;
 
     // KPI
@@ -3438,11 +3434,11 @@ async function printAnnualReport() {
     const annRankColors=['#f59e0b','#94a3b8','#cd7c4a','#64748b','#64748b'];
     const annColW=(CW-6)/2;
     const annCol2X=M+annColW+6;
-    setFill('#1a2230'); pdf.setLineWidth(0); pdf.rect(M,y,annColW,7,'F');
-    jpText('■ 日付別 TOP5',M+3,y+1.5,8,'#ffffff');
-    setFill('#1a2230'); pdf.rect(annCol2X,y,annColW,7,'F');
-    jpText('■ スタッフ別 TOP5',annCol2X+3,y+1.5,8,'#ffffff');
-    y+=9;
+    setFill('#1a2230'); pdf.setLineWidth(0); pdf.rect(M,y,annColW,9,'F');
+    jpText('■ 日付別 TOP5',M+3,y+3.5,11,'#ffffff');
+    setFill('#1a2230'); pdf.rect(annCol2X,y,annColW,9,'F');
+    jpText('■ スタッフ別 TOP5',annCol2X+3,y+3.5,11,'#ffffff');
+    y+=11;
     const annRankRowH=5;
     const annStartY=y;
     peakDays.forEach((d,i)=>{
@@ -3508,7 +3504,6 @@ async function printAnnualReport() {
     // ===== 2ページ =====
     pdf.addPage(); y=M;
     jpText(`夜勤業務実績報告　${annualYear}年度（詳細①）`,M,y,15,'#1a2230'); y+=8;
-    jpText('臨床工学部　CE夜勤業務集計システム',M,y,8,'#64748b'); y+=3;
     hLine(y,'#1a2230',1); y+=5;
 
     y=sectionHeader('■ 月別業務件数推移',y,'#3b82f6'); nl(2);
@@ -3533,7 +3528,6 @@ async function printAnnualReport() {
     // ===== 3ページ =====
     pdf.addPage(); y=M;
     jpText(`夜勤業務実績報告　${annualYear}年度（詳細②）`,M,y,15,'#1a2230'); y+=8;
-    jpText('臨床工学部　CE夜勤業務集計システム',M,y,8,'#64748b'); y+=3;
     hLine(y,'#1a2230',1); y+=5;
 
     y=sectionHeader('■ OC呼び出し率　月別推移',y,'#ea580c'); nl(2);
@@ -3561,7 +3555,6 @@ async function printAnnualReport() {
     // ===== 4ページ：スタッフランキング① =====
     pdf.addPage(); y=M;
     jpText(`夜勤業務実績報告　${annualYear}年度（スタッフランキング）`,M,y,15,'#1a2230'); y+=8;
-    jpText('臨床工学部　CE夜勤業務集計システム',M,y,8,'#64748b'); y+=3;
     hLine(y,'#1a2230',1); y+=6;
 
     // スタッフ別集計
@@ -3597,7 +3590,7 @@ async function printAnnualReport() {
     const medals2 = ['🥇','🥈','🥉'];
 
     function pdfRankSection(title, color, getVal, unit, top=10) {
-      if(!isFinite(y)||y > H-M-30){ pdf.addPage(); y=M; jpText(`夜勤業務実績報告　${annualYear}年度（スタッフランキング）`,M,y,12,'#1a2230'); y+=10; hLine(y,'#1a2230',0.5); y+=5; }
+      if(!isFinite(y)||y > H-M-30){ pdf.addPage(); y=M; jpText(`夜勤業務実績報告　${annualYear}年度（スタッフランキング）`,M,y,13,'#1a2230'); y+=9; hLine(y,'#1a2230',0.8); y+=4; }
       y=sectionHeader(title, y, color); nl(2);
       const rawRows = staffList2.map(([name,sd])=>{
         const rawVal = getVal(sd);
@@ -3631,7 +3624,7 @@ async function printAnnualReport() {
     pdfRankSection('■ 1夜勤平均業務件数 TOP10','#f59e0b',sd=>sd.nights?parseFloat((sd.total/sd.nights).toFixed(1)):0,'件/夜勤');
 
     // 業務件数最多夜勤TOP10（日付単位）
-    if(!isFinite(y)||y > H-M-30){ pdf.addPage(); y=M; jpText(`夜勤業務実績報告　${annualYear}年度（スタッフランキング）`,M,y,12,'#1a2230'); y+=10; hLine(y,'#1a2230',0.5); y+=5; }
+    if(!isFinite(y)||y > H-M-30){ pdf.addPage(); y=M; jpText(`夜勤業務実績報告　${annualYear}年度（スタッフランキング）`,M,y,13,'#1a2230'); y+=9; hLine(y,'#1a2230',0.8); y+=4; }
     y=sectionHeader('■ 業務件数最多夜勤 TOP10','#1a2230'); nl(2);
     const peakRecs2=yearRecs.map(r=>({date:r.date,dow:['日','月','火','水','木','金','土'][new Date(r.date+'T00:00:00').getDay()],staff:(r.staff||[]).join('・'),total:Object.values(r.tasks||{}).reduce((s,v)=>s+v,0)+(r.freeTasks||[]).reduce((s,ft)=>s+(ft.count||1),0)})).sort((a,b)=>b.total-a.total).slice(0,10);
     const maxPeak=peakRecs2.length?peakRecs2[0].total:1;
@@ -3802,8 +3795,7 @@ CE夜勤業務集計システム
       <div class="report-page">
         <div class="report-page-header">
           <div class="report-page-title">夜勤業務実績報告　${fmtYMDisp(sMonth)}</div>
-          <div class="report-page-sub">臨床工学部　CE夜勤業務集計システム</div>
-        </div>
+                  </div>
 
         <!-- テキストエリア（編集可能） -->
         <div class="report-text-editable" id="report-text-area" contenteditable="true">${reportText.replace(/\n/g,'<br>').replace(/ /g,'&nbsp;')}</div>
@@ -3824,8 +3816,7 @@ CE夜勤業務集計システム
       <div class="report-page" style="page-break-before:always">
         <div class="report-page-header">
           <div class="report-page-title">夜勤業務実績報告　${fmtYMDisp(sMonth)}　（詳細）</div>
-          <div class="report-page-sub">臨床工学部　CE夜勤業務集計システム</div>
-        </div>
+                  </div>
 
         <!-- 補助循環・緊急カテ推移 -->
         <div class="report-chart-box" style="margin-bottom:12px">
@@ -4197,7 +4188,7 @@ async function printReport() {
       const safeY = (isFinite(fy)&&fy>0) ? fy : y;
       setFill(bg); pdf.setLineWidth(0);
       pdf.rect(M, safeY, CW, 7, 'F');
-      jpText(title, M+3, safeY+2, 11, '#ffffff');
+      jpText(title, M+3, safeY+3.5, 11, '#ffffff');
       return safeY + 9;
     };
 
@@ -4295,7 +4286,6 @@ async function printReport() {
     // ===== 1ページ目 =====
     // タイトル
     jpText(titleStr, M, y, 15, '#1a2230'); y += 8;
-    jpText('臨床工学部　CE夜勤業務集計システム', M, y, 8, '#64748b'); y += 3;
     hLine(y, '#1a2230', 1); y += 5;
 
     // KPI
@@ -4313,12 +4303,12 @@ async function printReport() {
     const col2X = M + colW + 6;
 
     // 左カラムヘッダー
-    setFill('#1a2230'); pdf.setLineWidth(0); pdf.rect(M, y, colW, 7, 'F');
-    jpText('■ 日付別 TOP5', M+3, y+1.5, 8, '#ffffff');
+    setFill('#1a2230'); pdf.setLineWidth(0); pdf.rect(M, y, colW, 9, 'F');
+    jpText('■ 日付別 TOP5', M+3, y+3.5, 11, '#ffffff');
     // 右カラムヘッダー
-    setFill('#1a2230'); pdf.rect(col2X, y, colW, 7, 'F');
-    jpText('■ スタッフ別 TOP5', col2X+3, y+1.5, 8, '#ffffff');
-    y += 9;
+    setFill('#1a2230'); pdf.rect(col2X, y, colW, 9, 'F');
+    jpText('■ スタッフ別 TOP5', col2X+3, y+3.5, 11, '#ffffff');
+    y += 11;
 
     const rankRowH = 5;
     const startY = y;
@@ -4413,7 +4403,6 @@ async function printReport() {
     pdf.addPage();
     y = M;
     jpText(`夜勤業務実績報告　${fmtYMDisp(sMonth)}　（詳細グラフ①）`, M, y, 13, '#1a2230'); y += 7;
-    jpText('臨床工学部　CE夜勤業務集計システム', M, y, 7, '#64748b'); y += 2;
     hLine(y, '#1a2230', 0.8); y += 4;
 
     // グラフ専用barRow（checkPageなし・固定レイアウト）
@@ -4436,10 +4425,10 @@ async function printReport() {
 
     // 中段：時間帯円グラフ＋補助循環グラフ 横並び
     const midY = y;
-    setFill('#1a2230'); pdf.setLineWidth(0); pdf.rect(M, y, halfW, 7, 'F');
-    jpText('■ 時間帯別業務分布', M+3, y+1.5, 8, '#ffffff');
-    setFill('#1a2230'); pdf.rect(M+halfW+4, y, halfW, 7, 'F');
-    jpText('■ 補助循環 / 緊急カテ　月別推移', M+halfW+7, y+1.5, 7, '#ffffff');
+    setFill('#1a2230'); pdf.setLineWidth(0); pdf.rect(M, y, halfW, 9, 'F');
+    jpText('■ 時間帯別業務分布', M+3, y+3.5, 11, '#ffffff');
+    setFill('#1a2230'); pdf.rect(M+halfW+4, y, halfW, 9, 'F');
+    jpText('■ 補助循環 / 緊急カテ　月別推移', M+halfW+7, y+3.5, 11, '#ffffff');
     y += 9;
 
     if (slotSum > 0) {
