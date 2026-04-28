@@ -4411,37 +4411,51 @@ async function printReport() {
 
     jpText(`作成日：${new Date().toLocaleDateString('ja-JP')}`, M+CW, H-M, 7, '#64748b', 'right');
 
-    // ===== 2ページ目：グラフ =====
+    // ===== 2ページ目：グラフ① =====
     pdf.addPage();
     y = M;
-    jpText(`夜勤業務実績報告　${fmtYMDisp(sMonth)}　（詳細グラフ）`, M, y, 15, '#1a2230'); y += 8;
-    jpText('臨床工学部　CE夜勤業務集計システム', M, y, 8, '#64748b'); y += 3;
-    hLine(y, '#1a2230', 1); y += 5;
+    jpText(`夜勤業務実績報告　${fmtYMDisp(sMonth)}　（詳細グラフ①）`, M, y, 13, '#1a2230'); y += 7;
+    jpText('臨床工学部　CE夜勤業務集計システム', M, y, 7, '#64748b'); y += 2;
+    hLine(y, '#1a2230', 0.8); y += 4;
 
-    // 月別業務件数推移グラフ
-    y = sectionHeader('■ 月別業務件数推移', y, '#3b82f6'); nl(2);
-    await embedChart((ctx, cw, ch) => drawLineChart(ctx, cw, ch, allMonthLabels, allMonthGrands, '件', '#3b82f6', '業務件数'), M, y, CW, 50);
-    y += 52; nl(2);
+    // グラフ専用barRow（checkPageなし・固定レイアウト）
+    const barRowFixed = (label, val, maxVal, fy, barColor='#3b82f6', rowH=4.5) => {
+      const short = label.length > 22 ? label.slice(0,21)+'…' : label;
+      jpText(short, M, fy, 7, '#1e293b');
+      const barW = maxVal>0&&isFinite(val)?Math.min(CW-48,Math.max(1,(CW-48)*val/maxVal)):1;
+      setFill(barColor);
+      if(barW>0&&isFinite(barW)) pdf.rect(M+48, fy+0.3, barW, rowH-1.5, 'F');
+      jpText(val+'件', M+CW, fy, 7, '#64748b', 'right');
+      hLine(fy+rowH, '#e2e8f0', 0.15);
+      return fy + rowH;
+    };
 
-    // 時間帯別円グラフ
-    y = sectionHeader('■ 時間帯別業務分布', y); nl(2);
+    // 上半分：月別推移グラフ＋補助循環グラフ（横並び）
+    const halfW = (CW - 4) / 2;
+    y = sectionHeader('■ 月別業務件数推移', y, '#3b82f6'); y += 1;
+    await embedChart((ctx, cw, ch) => drawLineChart(ctx, cw, ch, allMonthLabels, allMonthGrands, '件', '#3b82f6', '業務件数'), M, y, CW, 40);
+    y += 42; y += 3;
+
+    // 中段：時間帯円グラフ＋補助循環グラフ 横並び
+    const midY = y;
+    setFill('#1a2230'); pdf.setLineWidth(0); pdf.rect(M, y, halfW, 7, 'F');
+    jpText('■ 時間帯別業務分布', M+3, y+1.5, 8, '#ffffff');
+    setFill('#1a2230'); pdf.rect(M+halfW+4, y, halfW, 7, 'F');
+    jpText('■ 補助循環 / 緊急カテ　月別推移', M+halfW+7, y+1.5, 7, '#ffffff');
+    y += 9;
+
     if (slotSum > 0) {
-      await embedChart((ctx, cw, ch) => drawPieChart(ctx, cw, ch, [{label:'準夜',value:slots.early,color:'#3b82f6'},{label:'深夜',value:slots.mid,color:'#7c3aed'},{label:'早朝',value:slots.late,color:'#06b6d4'}], slotSum), M, y, CW, 55);
-      y += 57;
+      await embedChart((ctx, cw, ch) => drawPieChart(ctx, cw, ch, [{label:'準夜',value:slots.early,color:'#3b82f6'},{label:'深夜',value:slots.mid,color:'#7c3aed'},{label:'早朝',value:slots.late,color:'#06b6d4'}], slotSum), M, y, halfW, 48);
     } else {
-      jpText('時間帯データ未記録', M+2, y, 8, '#94a3b8'); y += 10;
+      jpText('時間帯データ未記録', M+2, y+10, 8, '#94a3b8');
     }
-    nl(2);
-
-    // 補助循環・緊急カテ推移
-    y = sectionHeader('■ 補助循環導入 / 緊急カテーテル対応　月別推移', y, '#dc2626'); nl(2);
-    await embedChart((ctx, cw, ch) => drawMultiLineChart(ctx, cw, ch, allMonthLabels, [{label:'補助循環導入',values:allMonthAssist,color:'#dc2626'},{label:'緊急カテ対応',values:allMonthEmerg,color:'#06b6d4'}], '件'), M, y, CW, 50);
-    y += 52; nl(2);
+    await embedChart((ctx, cw, ch) => drawMultiLineChart(ctx, cw, ch, allMonthLabels, [{label:'補助循環導入',values:allMonthAssist,color:'#dc2626'},{label:'緊急カテ対応',values:allMonthEmerg,color:'#06b6d4'}], '件'), M+halfW+4, y, halfW, 48);
+    y += 50; y += 4;
 
     // 業務件数ランキングTOP10
-    y = sectionHeader('■ 業務件数 ランキング TOP10', y); nl(2);
+    y = sectionHeader('■ 業務件数 ランキング TOP10', y); y += 2;
     const maxRank = top10.length ? top10[0][1] : 1;
-    top10.forEach(([name,val]) => { y = barRow(name, val, maxRank, y, '#3b82f6', 5); });
+    top10.forEach(([name,val]) => { y = barRowFixed(name, val, maxRank, y); });
 
     jpText(`作成日：${new Date().toLocaleDateString('ja-JP')}`, M+CW, H-M, 7, '#64748b', 'right');
 
