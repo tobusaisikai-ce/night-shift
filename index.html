@@ -2701,28 +2701,34 @@ function renderAnnualInsight() {
     </div>
 
     <div class="insight-card">
-      <div class="ic-title">📊 月別業務件数推移 / 時間帯別分布</div>
-      <div class="report-charts-row">
-        <div class="report-chart-box" style="flex:2">
-          <div class="report-chart-title">月別業務件数推移</div>
-          <canvas id="annual-chart-monthly" style="width:100%;height:180px"></canvas>
-        </div>
-        <div class="report-chart-box" style="flex:1;min-width:160px">
-          <div class="report-chart-title">時間帯別業務分布（年間）</div>
-          <canvas id="annual-chart-slot" style="width:100%;height:180px"></canvas>
-        </div>
+      <div class="ic-title">📊 月別業務件数推移</div>
+      <div class="report-chart-box">
+        <div class="report-chart-title">月別業務件数推移</div>
+        <canvas id="annual-chart-monthly" style="width:100%;height:220px"></canvas>
       </div>
     </div>
 
     <div class="insight-card">
-      <div class="ic-title">📊 補助循環・緊急カテ推移 / 業務ランキング</div>
-      <div class="report-chart-box" style="margin-bottom:12px">
-        <div class="report-chart-title">補助循環導入 / 緊急カテーテル対応　月別推移</div>
-        <canvas id="annual-chart-emerg" style="width:100%;height:180px"></canvas>
-      </div>
+      <div class="ic-title">📊 時間帯別業務分布（年間）</div>
       <div class="report-chart-box">
-        <div class="report-chart-title">業務件数 ランキング TOP10（年間）</div>
-        <canvas id="annual-chart-rank" style="width:100%;height:260px"></canvas>
+        <div class="report-chart-title">時間帯別業務分布</div>
+        <canvas id="annual-chart-slot" style="width:100%;height:260px"></canvas>
+      </div>
+    </div>
+
+    <div class="insight-card">
+      <div class="ic-title">📊 補助循環導入 / 緊急カテーテル対応　月別推移</div>
+      <div class="report-chart-box" style="margin-bottom:12px">
+        <div class="report-chart-title">補助循環導入 / 緊急カテーテル対応</div>
+        <canvas id="annual-chart-emerg" style="width:100%;height:220px"></canvas>
+      </div>
+    </div>
+
+    <div class="insight-card">
+      <div class="ic-title">📊 業務件数 ランキング TOP10（年間）</div>
+      <div class="report-chart-box">
+        <div class="report-chart-title">業務件数 ランキング TOP10</div>
+        <canvas id="annual-chart-rank" style="width:100%;height:300px"></canvas>
       </div>
     </div>
 
@@ -2860,26 +2866,36 @@ CE夜勤業務集計システム
       <div class="report-page">
         <div class="report-page-header">
           <div class="report-page-title">夜勤業務実績報告　${annualYear}年度 年次</div>
-          <div class="report-page-sub">関東労災病院　臨床工学部　CE夜勤業務集計システム</div>
+          <div class="report-page-sub">臨床工学部　CE夜勤業務集計システム</div>
         </div>
         <div class="report-text-editable" id="annual-report-text-area" contenteditable="true">${reportText.replace(/\n/g,'<br>').replace(/ /g,'&nbsp;')}</div>
-        <div class="report-charts-row">
-          <div class="report-chart-box" style="flex:2"><div class="report-chart-title">月別業務件数推移</div><canvas id="ar-chart-monthly" style="width:100%;height:180px"></canvas></div>
-          <div class="report-chart-box" style="flex:1;min-width:160px"><div class="report-chart-title">時間帯別業務分布（年間）</div><canvas id="ar-chart-slot" style="width:100%;height:180px"></canvas></div>
+        <div class="report-chart-box" style="margin-bottom:12px">
+          <div class="report-chart-title">月別業務件数推移</div>
+          <canvas id="ar-chart-monthly" style="width:100%;height:200px"></canvas>
+        </div>
+        <div class="report-chart-box">
+          <div class="report-chart-title">時間帯別業務分布（年間）</div>
+          <canvas id="ar-chart-slot" style="width:100%;height:240px"></canvas>
         </div>
       </div>
       <div class="report-page" style="page-break-before:always">
         <div class="report-page-header">
           <div class="report-page-title">夜勤業務実績報告　${annualYear}年度（詳細①）</div>
-          <div class="report-page-sub">関東労災病院　臨床工学部　CE夜勤業務集計システム</div>
+          <div class="report-page-sub">臨床工学部　CE夜勤業務集計システム</div>
         </div>
-        <div class="report-chart-box" style="margin-bottom:12px"><div class="report-chart-title">補助循環導入 / 緊急カテーテル対応　月別推移</div><canvas id="ar-chart-emerg" style="width:100%;height:180px"></canvas></div>
-        <div class="report-chart-box"><div class="report-chart-title">業務件数 ランキング TOP10（年間）</div><canvas id="ar-chart-rank" style="width:100%;height:260px"></canvas></div>
+        <div class="report-chart-box" style="margin-bottom:12px">
+          <div class="report-chart-title">補助循環導入 / 緊急カテーテル対応　月別推移</div>
+          <canvas id="ar-chart-emerg" style="width:100%;height:200px"></canvas>
+        </div>
+        <div class="report-chart-box">
+          <div class="report-chart-title">業務件数 ランキング TOP10（年間）</div>
+          <canvas id="ar-chart-rank" style="width:100%;height:280px"></canvas>
+        </div>
       </div>
       <div class="report-page" style="page-break-before:always">
         <div class="report-page-header">
           <div class="report-page-title">夜勤業務実績報告　${annualYear}年度（詳細②）</div>
-          <div class="report-page-sub">関東労災病院　臨床工学部　CE夜勤業務集計システム</div>
+          <div class="report-page-sub">臨床工学部　CE夜勤業務集計システム</div>
         </div>
         <div class="report-chart-box" style="margin-bottom:12px"><div class="report-chart-title">OC呼び出し率　月別推移</div><canvas id="ar-chart-oc" style="width:100%;height:180px"></canvas></div>
         <div class="report-chart-box" style="margin-bottom:12px"><div class="report-chart-title">心外オンコール 担当者別集計（年間）</div><canvas id="ar-chart-cardiac" style="width:100%;height:${Math.max(120,cardiacEntries.length*44+30)}px"></canvas></div>
@@ -2982,6 +2998,12 @@ function renderReport() {
   }).filter(d=>d.oncallCount>0);
 
   // 資料テキスト生成
+  // グラフ用：過去12ヶ月の月別データ
+  const allMonths = [...new Set(allRecs.map(r=>r.date.slice(0,7)))].sort().slice(-12);
+  const allMonthLabels = allMonths.map(m=>m.slice(5)+'月');
+  const allMonthGrands = allMonths.map(m=>allRecs.filter(r=>r.date.startsWith(m)).reduce((s,r)=>s+Object.values(r.tasks||{}).reduce((a,v)=>a+v,0)+(r.freeTasks||[]).reduce((a,ft)=>a+(ft.count||1),0),0));
+  const allMonthAssist = allMonths.map(m=>{ const tt={}; allRecs.filter(r=>r.date.startsWith(m)).forEach(r=>Object.entries(r.tasks||{}).forEach(([n,v])=>tt[n]=(tt[n]||0)+v)); return Object.entries(tt).filter(([n])=>assistKw.some(k=>n.includes(k))).reduce((s,[,v])=>s+v,0); });
+  const allMonthEmerg  = allMonths.map(m=>{ const tt={}; allRecs.filter(r=>r.date.startsWith(m)).forEach(r=>Object.entries(r.tasks||{}).forEach(([n,v])=>tt[n]=(tt[n]||0)+v)); return Object.entries(tt).filter(([n])=>emergKw.some(k=>n.includes(k))).reduce((s,[,v])=>s+v,0); });
   const reportText = `━━━━━━━━━━━━━━━━━━━━━━━
 【夜勤業務実績報告】${fmtYMDisp(sMonth)}
 ━━━━━━━━━━━━━━━━━━━━━━━
@@ -3045,23 +3067,21 @@ CE夜勤業務集計システム
       <div class="report-page">
         <div class="report-page-header">
           <div class="report-page-title">夜勤業務実績報告　${fmtYMDisp(sMonth)}</div>
-          <div class="report-page-sub">関東労災病院　臨床工学部　CE夜勤業務集計システム</div>
+          <div class="report-page-sub">臨床工学部　CE夜勤業務集計システム</div>
         </div>
 
         <!-- テキストエリア（編集可能） -->
         <div class="report-text-editable" id="report-text-area" contenteditable="true">${reportText.replace(/\n/g,'<br>').replace(/ /g,'&nbsp;')}</div>
 
-        <div class="report-charts-row">
-          <!-- 月別業務件数推移 -->
-          <div class="report-chart-box" style="flex:2">
-            <div class="report-chart-title">月別業務件数推移</div>
-            <canvas id="chart-monthly" style="width:100%;height:180px"></canvas>
-          </div>
-          <!-- 時間帯別円グラフ -->
-          <div class="report-chart-box" style="flex:1;min-width:160px">
-            <div class="report-chart-title">時間帯別業務分布</div>
-            <canvas id="chart-slot" style="width:100%;height:180px"></canvas>
-          </div>
+        <!-- 月別業務件数推移 -->
+        <div class="report-chart-box" style="margin-bottom:12px">
+          <div class="report-chart-title">月別業務件数推移</div>
+          <canvas id="chart-monthly" style="width:100%;height:200px"></canvas>
+        </div>
+        <!-- 時間帯別円グラフ -->
+        <div class="report-chart-box">
+          <div class="report-chart-title">時間帯別業務分布</div>
+          <canvas id="chart-slot" style="width:100%;height:240px"></canvas>
         </div>
       </div>
 
@@ -3069,19 +3089,19 @@ CE夜勤業務集計システム
       <div class="report-page" style="page-break-before:always">
         <div class="report-page-header">
           <div class="report-page-title">夜勤業務実績報告　${fmtYMDisp(sMonth)}　（詳細）</div>
-          <div class="report-page-sub">関東労災病院　臨床工学部　CE夜勤業務集計システム</div>
+          <div class="report-page-sub">臨床工学部　CE夜勤業務集計システム</div>
         </div>
 
         <!-- 補助循環・緊急カテ推移 -->
         <div class="report-chart-box" style="margin-bottom:12px">
           <div class="report-chart-title">補助循環導入 / 緊急カテーテル対応　月別推移</div>
-          <canvas id="chart-emerg" style="width:100%;height:180px"></canvas>
+          <canvas id="chart-emerg" style="width:100%;height:200px"></canvas>
         </div>
 
         <!-- 業務件数ランキング横棒 -->
         <div class="report-chart-box" style="margin-bottom:12px">
           <div class="report-chart-title">業務件数 ランキング TOP10</div>
-          <canvas id="chart-rank" style="width:100%;height:260px"></canvas>
+          <canvas id="chart-rank" style="width:100%;height:280px"></canvas>
         </div>
 
         <!-- 追記メモ -->
@@ -3099,14 +3119,14 @@ CE夜勤業務集計システム
       <button class="copy-report-btn" style="background:var(--green)" onclick="printReport()">🖨️ PDF出力（印刷）</button>
     </div>`;
 
-  // グラフ描画
+  // グラフ描画（レイアウト完了後に実行）
   window._reportText = reportText;
   setTimeout(()=>{
-    drawMonthlyChart(allRecs);
-    drawSlotChart(slots);
-    drawEmergChart(allRecs);
-    drawRankChart(taskTot);
-  }, 100);
+    const r1 = initCanvas(document.getElementById('chart-monthly')); if(r1) drawLineChart(r1.ctx,r1.w,r1.h,allMonthLabels,allMonthGrands,'件','#3b82f6','業務件数');
+    const r2 = initCanvas(document.getElementById('chart-slot')); if(r2){ const tot=slots.early+slots.mid+slots.late; if(tot) drawPieChart(r2.ctx,r2.w,r2.h,[{label:'準夜',value:slots.early,color:'#3b82f6'},{label:'深夜',value:slots.mid,color:'#7c3aed'},{label:'早朝',value:slots.late,color:'#06b6d4'}],tot); }
+    const r3 = initCanvas(document.getElementById('chart-emerg')); if(r3) drawMultiLineChart(r3.ctx,r3.w,r3.h,allMonthLabels,[{label:'補助循環導入',values:allMonthAssist,color:'#dc2626'},{label:'緊急カテ対応',values:allMonthEmerg,color:'#06b6d4'}],'件');
+    const r4 = initCanvas(document.getElementById('chart-rank')); if(r4){ const top10=Object.entries(taskTot).sort((a,b)=>b[1]-a[1]).slice(0,10); if(top10.length) drawHBarChart(r4.ctx,r4.w,r4.h,top10); }
+  }, 200);
 }
 
 // ===== グラフ描画関数 =====
@@ -3175,92 +3195,177 @@ function drawRankChart(taskTot) {
 
 // ===== 折れ線グラフ（単系列） =====
 function drawLineChart(ctx, w, h, labels, values, yUnit, color, seriesLabel) {
-  const pad = {top:20,right:20,bottom:40,left:45};
-  const cw = w-pad.left-pad.right, ch = h-pad.top-pad.bottom;
+  const pad = {top:24, right:16, bottom:36, left:44};
+  const cw = w - pad.left - pad.right;
+  const ch = h - pad.top - pad.bottom;
   const max = Math.max(...values, 1);
-  ctx.clearRect(0,0,w,h);
-  ctx.strokeStyle='#e2e8f0'; ctx.lineWidth=1;
+  ctx.clearRect(0, 0, w, h);
+
   // グリッド・Y軸ラベル
-  for (let i=0;i<=4;i++) {
-    const y = pad.top + ch*(1-i/4);
-    ctx.beginPath(); ctx.moveTo(pad.left,y); ctx.lineTo(pad.left+cw,y); ctx.stroke();
-    ctx.fillStyle='#64748b'; ctx.font='9px sans-serif'; ctx.textAlign='right';
-    ctx.fillText(Math.round(max*i/4)+yUnit, pad.left-4, y+3);
+  ctx.strokeStyle = '#e2e8f0'; ctx.lineWidth = 0.5;
+  for (let i = 0; i <= 4; i++) {
+    const y = pad.top + ch * (1 - i/4);
+    ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(pad.left + cw, y); ctx.stroke();
+    ctx.fillStyle = '#64748b'; ctx.font = '9px sans-serif'; ctx.textAlign = 'right';
+    ctx.fillText(Math.round(max * i / 4) + yUnit, pad.left - 4, y + 3);
   }
-  // Y軸タイトル
-  ctx.save(); ctx.translate(12,pad.top+ch/2); ctx.rotate(-Math.PI/2);
-  ctx.fillStyle='#64748b'; ctx.font='9px sans-serif'; ctx.textAlign='center';
-  ctx.fillText(yUnit, 0, 0); ctx.restore();
+
   // X軸ラベル
-  ctx.fillStyle='#64748b'; ctx.font='9px sans-serif'; ctx.textAlign='center';
-  labels.forEach((l,i)=>{ const x=pad.left+cw*i/(labels.length-1||1); ctx.fillText(l,x,h-pad.bottom+14); });
-  // 折れ線
-  ctx.beginPath(); ctx.strokeStyle=color; ctx.lineWidth=2;
-  values.forEach((v,i)=>{ const x=pad.left+cw*i/(values.length-1||1), y=pad.top+ch*(1-v/max); i===0?ctx.moveTo(x,y):ctx.lineTo(x,y); });
-  ctx.stroke();
+  ctx.fillStyle = '#64748b'; ctx.font = '9px sans-serif'; ctx.textAlign = 'center';
+  labels.forEach((l, i) => {
+    const x = pad.left + cw * i / Math.max(labels.length - 1, 1);
+    ctx.fillText(l, x, h - pad.bottom + 14);
+  });
+
+  if (values.length === 0) return;
+  const pts = values.map((v, i) => ({
+    x: pad.left + cw * i / Math.max(values.length - 1, 1),
+    y: pad.top + ch * (1 - v / max)
+  }));
+
   // 塗りつぶし
-  ctx.beginPath(); ctx.fillStyle=color+'22';
-  values.forEach((v,i)=>{ const x=pad.left+cw*i/(values.length-1||1), y=pad.top+ch*(1-v/max); i===0?ctx.moveTo(x,y):ctx.lineTo(x,y); });
-  ctx.lineTo(pad.left+cw,pad.top+ch); ctx.lineTo(pad.left,pad.top+ch); ctx.closePath(); ctx.fill();
-  // ドット・値
-  values.forEach((v,i)=>{ const x=pad.left+cw*i/(values.length-1||1), y=pad.top+ch*(1-v/max); ctx.beginPath(); ctx.arc(x,y,3,0,Math.PI*2); ctx.fillStyle=color; ctx.fill(); if(v>0){ctx.fillStyle='#1e293b';ctx.font='8px sans-serif';ctx.textAlign='center';ctx.fillText(v,x,y-6);} });
+  ctx.beginPath();
+  ctx.fillStyle = color + '22';
+  ctx.moveTo(pts[0].x, pts[0].y);
+  pts.forEach(p => ctx.lineTo(p.x, p.y));
+  ctx.lineTo(pts[pts.length-1].x, pad.top + ch);
+  ctx.lineTo(pts[0].x, pad.top + ch);
+  ctx.closePath(); ctx.fill();
+
+  // 折れ線
+  ctx.beginPath(); ctx.strokeStyle = color; ctx.lineWidth = 2;
+  pts.forEach((p, i) => i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y));
+  ctx.stroke();
+
+  // ドット・値ラベル
+  pts.forEach((p, i) => {
+    ctx.beginPath(); ctx.arc(p.x, p.y, 3.5, 0, Math.PI * 2);
+    ctx.fillStyle = color; ctx.fill();
+    ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5; ctx.stroke();
+    if (values[i] > 0) {
+      ctx.fillStyle = '#1e293b'; ctx.font = 'bold 8px sans-serif';
+      ctx.textAlign = 'center'; ctx.fillText(values[i], p.x, p.y - 7);
+    }
+  });
 }
 
 // ===== 折れ線グラフ（複数系列） =====
 function drawMultiLineChart(ctx, w, h, labels, series, yUnit) {
-  const pad = {top:30,right:20,bottom:40,left:45};
-  const cw = w-pad.left-pad.right, ch = h-pad.top-pad.bottom;
-  const max = Math.max(...series.flatMap(s=>s.values), 1);
-  ctx.clearRect(0,0,w,h);
-  ctx.strokeStyle='#e2e8f0'; ctx.lineWidth=1;
-  for (let i=0;i<=4;i++) {
-    const y = pad.top+ch*(1-i/4);
-    ctx.beginPath(); ctx.moveTo(pad.left,y); ctx.lineTo(pad.left+cw,y); ctx.stroke();
-    ctx.fillStyle='#64748b'; ctx.font='9px sans-serif'; ctx.textAlign='right';
-    ctx.fillText(Math.round(max*i/4)+yUnit, pad.left-4, y+3);
+  const pad = {top:28, right:16, bottom:36, left:44};
+  const cw = w - pad.left - pad.right;
+  const ch = h - pad.top - pad.bottom;
+  const max = Math.max(...series.flatMap(s => s.values), 1);
+  ctx.clearRect(0, 0, w, h);
+
+  // グリッド
+  ctx.strokeStyle = '#e2e8f0'; ctx.lineWidth = 0.5;
+  for (let i = 0; i <= 4; i++) {
+    const y = pad.top + ch * (1 - i/4);
+    ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(pad.left + cw, y); ctx.stroke();
+    ctx.fillStyle = '#64748b'; ctx.font = '9px sans-serif'; ctx.textAlign = 'right';
+    ctx.fillText(Math.round(max * i / 4) + yUnit, pad.left - 4, y + 3);
   }
-  ctx.fillStyle='#64748b'; ctx.font='9px sans-serif'; ctx.textAlign='center';
-  labels.forEach((l,i)=>{ const x=pad.left+cw*i/(labels.length-1||1); ctx.fillText(l,x,h-pad.bottom+14); });
+
+  // X軸ラベル
+  ctx.fillStyle = '#64748b'; ctx.font = '9px sans-serif'; ctx.textAlign = 'center';
+  labels.forEach((l, i) => {
+    const x = pad.left + cw * i / Math.max(labels.length - 1, 1);
+    ctx.fillText(l, x, h - pad.bottom + 14);
+  });
+
   // 凡例
-  series.forEach((s,si)=>{ ctx.fillStyle=s.color; ctx.fillRect(pad.left+si*100,6,12,8); ctx.fillStyle='#1e293b'; ctx.font='9px sans-serif'; ctx.textAlign='left'; ctx.fillText(s.label,pad.left+si*100+16,14); });
-  series.forEach(s=>{
-    ctx.beginPath(); ctx.strokeStyle=s.color; ctx.lineWidth=2;
-    s.values.forEach((v,i)=>{ const x=pad.left+cw*i/(s.values.length-1||1), y=pad.top+ch*(1-v/max); i===0?ctx.moveTo(x,y):ctx.lineTo(x,y); });
+  let lx = pad.left;
+  series.forEach(s => {
+    ctx.fillStyle = s.color; ctx.fillRect(lx, 6, 12, 8);
+    ctx.fillStyle = '#1e293b'; ctx.font = '9px sans-serif'; ctx.textAlign = 'left';
+    ctx.fillText(s.label, lx + 16, 14);
+    lx += ctx.measureText(s.label).width + 32;
+  });
+
+  // 各系列
+  series.forEach(s => {
+    const pts = s.values.map((v, i) => ({
+      x: pad.left + cw * i / Math.max(s.values.length - 1, 1),
+      y: pad.top + ch * (1 - v / max)
+    }));
+    ctx.beginPath(); ctx.strokeStyle = s.color; ctx.lineWidth = 2;
+    pts.forEach((p, i) => i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y));
     ctx.stroke();
-    s.values.forEach((v,i)=>{ const x=pad.left+cw*i/(s.values.length-1||1), y=pad.top+ch*(1-v/max); ctx.beginPath(); ctx.arc(x,y,3,0,Math.PI*2); ctx.fillStyle=s.color; ctx.fill(); if(v>0){ctx.fillStyle='#1e293b';ctx.font='8px sans-serif';ctx.textAlign='center';ctx.fillText(v,x,y-6);} });
+    pts.forEach((p, i) => {
+      ctx.beginPath(); ctx.arc(p.x, p.y, 3.5, 0, Math.PI * 2);
+      ctx.fillStyle = s.color; ctx.fill();
+      ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5; ctx.stroke();
+      if (s.values[i] > 0) {
+        ctx.fillStyle = '#1e293b'; ctx.font = 'bold 8px sans-serif';
+        ctx.textAlign = 'center'; ctx.fillText(s.values[i], p.x, p.y - 7);
+      }
+    });
   });
 }
 
 // ===== 円グラフ =====
 function drawPieChart(ctx, w, h, data, total) {
-  const legendW = 90;
-  const cx = (w - legendW) * 0.5, cy = h * 0.5;
-  const r = Math.min((w - legendW) * 0.42, h * 0.42);
-  ctx.clearRect(0,0,w,h);
-  let angle = -Math.PI/2;
-  data.forEach(d=>{
-    const slice = d.value/total*Math.PI*2;
-    ctx.beginPath(); ctx.moveTo(cx,cy); ctx.arc(cx,cy,r,angle,angle+slice); ctx.closePath();
-    ctx.fillStyle=d.color; ctx.fill();
-    ctx.strokeStyle='#fff'; ctx.lineWidth=2; ctx.stroke();
-    const pct = Math.round(d.value/total*100);
-    if (pct > 5) {
-      const mid = angle+slice/2;
-      const lx = cx+Math.cos(mid)*r*0.65, ly = cy+Math.sin(mid)*r*0.65;
-      ctx.fillStyle='#fff'; ctx.font=`bold ${Math.max(9,Math.min(12,r/5))}px sans-serif`;
-      ctx.textAlign='center'; ctx.fillText(pct+'%', lx, ly+4);
+  ctx.clearRect(0, 0, w, h);
+
+  const legendH = 60;
+  const chartH = h - legendH;
+  const cx = w / 2;
+  const cy = chartH / 2;
+  const r = Math.min(cx, cy) * 0.82;
+
+  // 円グラフ描画
+  let angle = -Math.PI / 2;
+  data.forEach(d => {
+    const slice = d.value / total * Math.PI * 2;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.arc(cx, cy, r, angle, angle + slice);
+    ctx.closePath();
+    ctx.fillStyle = d.color;
+    ctx.fill();
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // %ラベル（スライス内）
+    const pct = Math.round(d.value / total * 100);
+    if (pct > 8) {
+      const mid = angle + slice / 2;
+      const lx = cx + Math.cos(mid) * r * 0.62;
+      const ly = cy + Math.sin(mid) * r * 0.62;
+      ctx.fillStyle = '#fff';
+      ctx.font = `bold ${Math.max(10, Math.min(13, r / 4))}px sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(pct + '%', lx, ly);
     }
     angle += slice;
   });
-  // 凡例（右側）
-  const lx = w - legendW + 6;
-  data.forEach((d,i)=>{
-    const ly = h/2 - 24 + i*24;
-    ctx.fillStyle=d.color; ctx.fillRect(lx, ly, 10, 10);
-    ctx.fillStyle='#1e293b'; ctx.font='10px sans-serif'; ctx.textAlign='left';
-    ctx.fillText(`${d.label}`, lx+14, ly+9);
-    ctx.fillStyle='#64748b'; ctx.font='9px sans-serif';
-    ctx.fillText(`${d.value}件(${Math.round(d.value/total*100)}%)`, lx+14, ly+20);
+
+  // 凡例（下部・横並び）
+  const legendY = chartH + 8;
+  const itemW = w / data.length;
+  data.forEach((d, i) => {
+    const lx = itemW * i + itemW / 2;
+    const pct = Math.round(d.value / total * 100);
+
+    // カラーボックス
+    ctx.fillStyle = d.color;
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(lx - 16, legendY, 12, 12, 2);
+    else ctx.rect(lx - 16, legendY, 12, 12);
+    ctx.fill();
+
+    // テキスト
+    ctx.fillStyle = '#1e293b';
+    ctx.font = `bold 10px sans-serif`;
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'top';
+    ctx.fillText(d.label, lx - 1, legendY);
+
+    ctx.fillStyle = '#64748b';
+    ctx.font = '9px sans-serif';
+    ctx.fillText(`${d.value}件(${pct}%)`, lx - 1, legendY + 13);
   });
 }
 
