@@ -3356,7 +3356,7 @@ async function printAnnualReport() {
     const sectionHeader = (title, fy, bg='#1a2230') => {
       const safeY = (isFinite(fy)&&fy>0) ? fy : y;
       setFill(bg); pdf.setLineWidth(0); pdf.rect(M,safeY,CW,7,'F');
-      jpText(title,M+3,safeY+3.5,11,'#ffffff'); return safeY+9;
+      jpText(title,M+3,safeY+1.8,11,'#ffffff'); return safeY+9;
     };
 
     const barRow = (label, val, maxVal, fy, barColor='#3b82f6', rowH=5.5) => {
@@ -3435,9 +3435,9 @@ async function printAnnualReport() {
     const annColW=(CW-6)/2;
     const annCol2X=M+annColW+6;
     setFill('#1a2230'); pdf.setLineWidth(0); pdf.rect(M,y,annColW,9,'F');
-    jpText('■ 日付別 TOP5',M+3,y+3.5,11,'#ffffff');
+    jpText('■ 日付別 TOP5',M+3,y+2.6,11,'#ffffff');
     setFill('#1a2230'); pdf.rect(annCol2X,y,annColW,9,'F');
-    jpText('■ スタッフ別 TOP5',annCol2X+3,y+3.5,11,'#ffffff');
+    jpText('■ スタッフ別 TOP5',annCol2X+3,y+2.6,11,'#ffffff');
     y+=11;
     const annRankRowH=5;
     const annStartY=y;
@@ -4188,7 +4188,7 @@ async function printReport() {
       const safeY = (isFinite(fy)&&fy>0) ? fy : y;
       setFill(bg); pdf.setLineWidth(0);
       pdf.rect(M, safeY, CW, 7, 'F');
-      jpText(title, M+3, safeY+3.5, 11, '#ffffff');
+      jpText(title, M+3, safeY+1.8, 11, '#ffffff');
       return safeY + 9;
     };
 
@@ -4304,10 +4304,10 @@ async function printReport() {
 
     // 左カラムヘッダー
     setFill('#1a2230'); pdf.setLineWidth(0); pdf.rect(M, y, colW, 9, 'F');
-    jpText('■ 日付別 TOP5', M+3, y+3.5, 11, '#ffffff');
+    jpText('■ 日付別 TOP5', M+3, y+2.6, 11, '#ffffff');
     // 右カラムヘッダー
     setFill('#1a2230'); pdf.rect(col2X, y, colW, 9, 'F');
-    jpText('■ スタッフ別 TOP5', col2X+3, y+3.5, 11, '#ffffff');
+    jpText('■ スタッフ別 TOP5', col2X+3, y+2.6, 11, '#ffffff');
     y += 11;
 
     const rankRowH = 5;
@@ -4426,9 +4426,9 @@ async function printReport() {
     // 中段：時間帯円グラフ＋補助循環グラフ 横並び
     const midY = y;
     setFill('#1a2230'); pdf.setLineWidth(0); pdf.rect(M, y, halfW, 9, 'F');
-    jpText('■ 時間帯別業務分布', M+3, y+3.5, 11, '#ffffff');
+    jpText('■ 時間帯別業務分布', M+3, y+2.6, 11, '#ffffff');
     setFill('#1a2230'); pdf.rect(M+halfW+4, y, halfW, 9, 'F');
-    jpText('■ 補助循環 / 緊急カテ　月別推移', M+halfW+7, y+3.5, 11, '#ffffff');
+    jpText('■ 補助循環 / 緊急カテ　月別推移', M+halfW+7, y+2.6, 11, '#ffffff');
     y += 9;
 
     if (slotSum > 0) {
