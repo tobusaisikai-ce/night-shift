@@ -3359,6 +3359,7 @@ async function printAnnualReport() {
       jpText(title,M+3,safeY+1.8,11,'#ffffff'); return safeY+9;
     };
 
+    const LBAR = 58; // ラベル固定幅mm（全棒グラフ共通）
     const barRow = (label, val, maxVal, fy, barColor='#3b82f6', rowH=5.5) => {
       const short = label.length>20?label.slice(0,19)+'…':label;
       jpText(short,M,fy,8.5,'#1e293b');
