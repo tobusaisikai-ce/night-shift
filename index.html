@@ -811,7 +811,10 @@ const TASK_GROUPS = [
     'CHDF回路交換（小児）','CHDF終了（小児）'
   ]},
   { id:'dialysis', label:'透析・血液浄化（HD/PE/PMX等）', cat:'p', tasks:[
-    'HD','PE','PMX','活性炭吸着'
+    'HD（成人）','HD（小児）',
+    'PE（成人）','PE（小児）',
+    'PMX（成人）','PMX（小児）',
+    '活性炭吸着（成人）','活性炭吸着（小児）'
   ]},
   { id:'hypo', label:'低体温療法', cat:'c', tasks:[
     '低体温療法（アークティックサン）','低体温療法（メディサーム）','低体温療法（サーモガード）'
@@ -1521,80 +1524,110 @@ function sumSlots(recs) {
 function buildSpecialReport(taskTot, nights, mode) {
   const label = mode === 'annual' ? '年間' : '今月';
 
-  // --- 補助循環導入 ---
-  const assistDefs = [
-    { keys: ['V-A ECMO開始'], label: 'V-A ECMO開始' },
-    { keys: ['V-V ECMO開始'], label: 'V-V ECMO開始' },
-    { keys: ['IABP開始'],     label: 'IABP開始' },
-    { keys: ['Impella CP開始'], label: 'Impella CP開始' },
-    { keys: ['Impella 5.5開始'], label: 'Impella 5.5開始' },
+  // カテゴリ別特記業務の定義
+  const SPECIAL_CATEGORIES = [
+    {
+      catLabel: '補助循環',
+      isAssist: true,
+      defs: [
+        { key: 'V-A ECMO開始（成人）', label: 'V-A ECMO開始（成人）' },
+        { key: 'V-A ECMO開始（小児）', label: 'V-A ECMO開始（小児）' },
+        { key: 'V-V ECMO開始（成人）', label: 'V-V ECMO開始（成人）' },
+        { key: 'V-V ECMO開始（小児）', label: 'V-V ECMO開始（小児）' },
+        { key: 'IABP開始',             label: 'IABP開始' },
+        { key: 'Impella CP開始',       label: 'Impella CP開始' },
+        { key: 'Impella 5.5開始',      label: 'Impella 5.5開始' },
+      ]
+    },
+    {
+      catLabel: '緊急カテーテル',
+      isEmerg: true,
+      defs: [
+        { key: '緊急カテーテル（CAG）', label: '緊急CAG' },
+        { key: '緊急カテーテル（PCI）', label: '緊急PCI' },
+        { key: '緊急カテーテル（EVT）', label: '緊急EVT' },
+        { key: '心筋生検',              label: '心筋生検' },
+        { key: '心嚢穿刺',              label: '心嚢穿刺' },
+      ]
+    },
+    {
+      catLabel: 'ペースメーカー関連',
+      defs: [
+        { key: '体外式ペースメーカー挿入', label: '体外式ペースメーカー挿入', note: '別集計' },
+      ]
+    },
+    {
+      catLabel: 'CHDF',
+      defs: [
+        { key: 'CHDF開始（小児）', label: 'CHDF開始（小児）' },
+      ]
+    },
+    {
+      catLabel: '透析・血液浄化（HD/PE/PMX等）',
+      defs: [
+        { key: 'HD（成人）',       label: 'HD（成人）' },
+        { key: 'HD（小児）',       label: 'HD（小児）' },
+        { key: 'PE（成人）',       label: 'PE（成人）' },
+        { key: 'PE（小児）',       label: 'PE（小児）' },
+        { key: 'PMX（成人）',      label: 'PMX（成人）' },
+        { key: 'PMX（小児）',      label: 'PMX（小児）' },
+        { key: '活性炭吸着（成人）', label: '活性炭吸着（成人）' },
+        { key: '活性炭吸着（小児）', label: '活性炭吸着（小児）' },
+      ]
+    },
+    {
+      catLabel: 'モニタリング・循環補助',
+      defs: [
+        { key: '経肺圧モニター対応', label: '経肺圧モニター対応' },
+      ]
+    },
+    {
+      catLabel: 'NO療法',
+      defs: [
+        { key: 'NO導入（成人）',   label: 'NO導入（成人）' },
+        { key: 'NO導入（小児）',   label: 'NO導入（小児）' },
+        { key: 'NO導入（新生児）', label: 'NO導入（新生児）' },
+      ]
+    },
+    {
+      catLabel: '緊急対応・手術',
+      defs: [
+        { key: 'コード・ブルー',                label: 'コード・ブルー' },
+        { key: 'コード・ピンク',                label: 'コード・ピンク' },
+        { key: '外傷コール（システム1000対応）', label: '外傷コール（システム1000対応）' },
+        { key: '外傷コール（対応なし）',         label: '外傷コール（対応なし）' },
+        { key: '緊急心臓外科手術（TEVAR含む）',  label: '緊急心臓外科手術' },
+        { key: '緊急TAVI（BAV含む）',            label: '緊急TAVI' },
+        { key: 'セルセーバー（エクストラ）',     label: 'セルセーバー' },
+        { key: '災害対応',                      label: '災害対応' },
+      ]
+    },
   ];
-  const assistItems = assistDefs.map(d => {
-    const cnt = Object.entries(taskTot).filter(([n])=>d.keys.some(k=>n.includes(k))).reduce((s,[,v])=>s+v,0);
-    return { label: d.label, cnt };
-  }).filter(d => d.cnt > 0);
-  const assistTotal = assistItems.reduce((s,d)=>s+d.cnt,0);
 
-  // --- 緊急カテーテル ---
-  const emergDefs = [
-    { keys: ['緊急カテーテル（CAG）'], label: '緊急CAG' },
-    { keys: ['緊急カテーテル（PCI）'], label: '緊急PCI' },
-    { keys: ['緊急カテーテル（EVT）'], label: '緊急EVT' },
-    { keys: ['心筋生検'],  label: '心筋生検' },
-    { keys: ['心嚢穿刺'],  label: '心嚢穿刺' },
-  ];
-  const emergItems = emergDefs.map(d => {
-    const cnt = Object.entries(taskTot).filter(([n])=>d.keys.some(k=>n.includes(k))).reduce((s,[,v])=>s+v,0);
-    return { label: d.label, cnt };
-  }).filter(d => d.cnt > 0);
-  const emergTotal = emergItems.reduce((s,d)=>s+d.cnt,0);
-
-  // --- 体外式ペースメーカー（別集計） ---
-  const pacingCnt = taskTot['体外式ペースメーカー挿入'] || 0;
-
-  // --- その他特記業務（あった場合のみ） ---
-  const specialDefs = [
-    { key: 'CHDF開始（小児）',           label: '小児CHDF開始' },
-    { key: 'PE',                          label: 'PE（血漿交換）' },
-    { key: '活性炭吸着',                  label: '活性炭吸着' },
-    { key: '経肺圧モニター対応',           label: '経肺圧モニター対応' },
-    { key: 'NO導入（成人）',              label: 'NO導入（成人）' },
-    { key: 'NO導入（小児）',              label: 'NO導入（小児）' },
-    { key: 'NO導入（新生児）',            label: 'NO導入（新生児）' },
-    { key: 'コード・ブルー',               label: 'コード・ブルー' },
-    { key: 'コード・ピンク',               label: 'コード・ピンク' },
-    { key: '外傷コール（システム1000対応）', label: '外傷コール（システム1000対応）' },
-    { key: '外傷コール（対応なし）',        label: '外傷コール（対応なし）' },
-    { key: '緊急心臓外科手術（TEVAR含む）', label: '緊急心臓外科手術' },
-    { key: '緊急TAVI（BAV含む）',          label: '緊急TAVI' },
-    { key: 'セルセーバー（エクストラ）',    label: 'セルセーバー' },
-    { key: '災害対応',                    label: '災害対応' },
-  ];
-  const specialItems = specialDefs.map(d => ({ label: d.label, cnt: taskTot[d.key] || 0 })).filter(d => d.cnt > 0);
-
-  // --- テキスト組み立て ---
   const lines = [];
 
-  if (assistTotal > 0) {
-    const rate = nights ? Math.round(assistTotal / nights * 100) : 0;
-    lines.push(`・補助循環開始：${assistTotal}件（${label}導入率 ${rate}%）`);
-    assistItems.forEach(d => lines.push(`　  ${d.label}：${d.cnt}件`));
-  }
+  SPECIAL_CATEGORIES.forEach(cat => {
+    const items = cat.defs
+      .map(d => ({ label: d.label, cnt: taskTot[d.key] || 0, note: d.note || '' }))
+      .filter(d => d.cnt > 0);
+    if (!items.length) return;
 
-  if (emergTotal > 0) {
-    const rate = nights ? Math.round(emergTotal / nights * 100) : 0;
-    lines.push(`・緊急カテーテル対応：${emergTotal}件（対応率 ${rate}%）`);
-    emergItems.forEach(d => lines.push(`　  ${d.label}：${d.cnt}件`));
-  }
+    const total = items.reduce((s, d) => s + d.cnt, 0);
 
-  if (pacingCnt > 0) {
-    lines.push(`・体外式ペースメーカー挿入：${pacingCnt}件（別集計）`);
-  }
+    if (cat.isAssist) {
+      const rate = nights ? Math.round(total / nights * 100) : 0;
+      lines.push(`・${cat.catLabel}：${total}件（${label}導入率 ${rate}%）`);
+    } else if (cat.isEmerg) {
+      const rate = nights ? Math.round(total / nights * 100) : 0;
+      lines.push(`・${cat.catLabel}：${total}件（対応率 ${rate}%）`);
+    } else {
+      lines.push(`・${cat.catLabel}：${total}件`);
+    }
 
-  if (specialItems.length > 0) {
-    lines.push(`・その他特記業務：`);
-    specialItems.forEach(d => lines.push(`　  ${d.label}：${d.cnt}件`));
-  }
+    items.forEach(d => {
+      lines.push(`　  ${d.label}：${d.cnt}件${d.note ? '（' + d.note + '）' : ''}`);
+    });
+  });
 
   if (lines.length === 0) {
     lines.push('・特記業務なし');
@@ -2749,7 +2782,231 @@ function renderAnnual() {
     html += `</div>`;
   }
 
+  // スタッフランキングセクション
+  html += buildStaffRankingHTML(yearRecs, annualYear);
+
   c.innerHTML = html;
+}
+
+function buildStaffRankingHTML(yearRecs, year) {
+  // カテゴリ定義
+  const RANK_CATS = [
+    {
+      id: 'assist',
+      label: '補助循環導入',
+      color: 'var(--red)',
+      keys: ['V-A ECMO開始','V-V ECMO開始','IABP開始','Impella CP開始','Impella 5.5開始']
+    },
+    {
+      id: 'emerg',
+      label: '緊急カテーテル対応',
+      color: 'var(--cyan)',
+      keys: ['緊急カテーテル（CAG）','緊急カテーテル（PCI）','緊急カテーテル（EVT）',
+             '心筋生検','心嚢穿刺','体外式ペースメーカー挿入']
+    },
+    {
+      id: 'dialysis',
+      label: '透析・血液浄化',
+      color: 'var(--accent)',
+      keys: ['HD（成人）','HD（小児）','PE（成人）','PE（小児）',
+             'PMX（成人）','PMX（小児）','活性炭吸着（成人）','活性炭吸着（小児）',
+             'CHDF開始（成人）','CHDF定時チェック（成人）','CHDFトラブル対応（成人）','CHDF回路交換（成人）','CHDF終了（成人）',
+             'CHDF開始（小児）','CHDF定時チェック（小児）','CHDFトラブル対応（小児）','CHDF回路交換（小児）','CHDF終了（小児）']
+    },
+    {
+      id: 'resp',
+      label: '呼吸管理対応',
+      color: 'var(--green)',
+      keys: ['挿管対応（成人）','挿管対応（小児）','挿管対応（新生児）',
+             'NPPV導入（成人）','NPPVトラブル対応（成人）','NPPV導入（小児）','NPPVトラブル対応（小児）',
+             'HFNC導入（成人）','HFNCトラブル対応（成人）','HFNC導入（小児）','HFNCトラブル対応（小児）',
+             'HFNC導入（新生児）','HFNCトラブル対応（新生児）',
+             'SiPAP導入','CNO導入','CPAP機対応',
+             '人工呼吸器トラブル対応（PB980）','人工呼吸器トラブル対応（V500）',
+             '人工呼吸器トラブル対応（Savina300）','人工呼吸器トラブル対応（Monnal T60）',
+             '人工呼吸器トラブル対応（VN800/VN500）','人工呼吸器トラブル対応（Vivo45）',
+             '人工呼吸器トラブル対応（Torilogy）','人工呼吸器トラブル対応（NKV）',
+             '人工呼吸器トラブル対応（その他）','加温加湿器対応','ネブライザ対応（全病棟）','パラパック対応',
+             '自動カフ圧計対応','呼吸器転棟・移動対応',
+             'NO導入（成人）','NOトラブル対応（成人）','NO導入（小児）','NOトラブル対応（小児）',
+             'NO導入（新生児）','NOトラブル対応（新生児）']
+    },
+    {
+      id: 'surgery',
+      label: '緊急対応・手術',
+      color: 'var(--orange)',
+      keys: ['コード・ブルー','コード・ピンク','外傷コール（システム1000対応）','外傷コール（対応なし）',
+             'ME業務機器対応（その他欄に記載）','緊急心臓外科手術（TEVAR含む）','緊急TAVI（BAV含む）',
+             '麻酔器対応','OPE機器対応（その他欄に記載）','セルセーバー（エクストラ）','多職種カンファレンス']
+    },
+    {
+      id: 'nights',
+      label: '夜勤回数',
+      color: 'var(--purple)',
+      isNights: true
+    },
+    {
+      id: 'avg',
+      label: '1夜勤平均業務件数',
+      color: '#f59e0b',
+      isAvg: true
+    },
+    {
+      id: 'peak',
+      label: '業務件数最多夜勤TOP3',
+      color: 'var(--red)',
+      isPeak: true
+    },
+    {
+      id: 'oc_call',
+      label: 'OC担当呼び出し',
+      color: 'var(--orange)',
+      isOcCall: true
+    },
+    {
+      id: 'oc_ext',
+      label: 'OC外呼び出し',
+      color: 'var(--red)',
+      isOcExt: true
+    },
+    {
+      id: 'oc_cardiac',
+      label: '心外OC呼び出し',
+      color: 'var(--purple)',
+      isOcCardiac: true
+    },
+  ];
+
+  // スタッフ別集計
+  const staffData = {};
+  yearRecs.forEach(r => {
+    const staff = (r.staff || []);
+    const taskTotal = Object.values(r.tasks||{}).reduce((s,v)=>s+v,0) + (r.freeTasks||[]).reduce((s,ft)=>s+(ft.count||1),0);
+    staff.forEach(name => {
+      if (!staffData[name]) staffData[name] = { nights: 0, taskTotal: 0, catCnts: {}, ocCall: 0, ocExt: 0, ocCardiac: 0, peakRecs: [] };
+      const sd = staffData[name];
+      sd.nights++;
+      sd.taskTotal += taskTotal;
+      sd.peakRecs.push({ date: r.date, total: taskTotal });
+
+      // カテゴリ別カウント
+      RANK_CATS.filter(c=>c.keys).forEach(cat => {
+        const cnt = Object.entries(r.tasks||{}).filter(([n])=>cat.keys.some(k=>n===k||n.includes(k))).reduce((s,[,v])=>s+v,0);
+        if (!sd.catCnts[cat.id]) sd.catCnts[cat.id] = 0;
+        sd.catCnts[cat.id] += cnt;
+      });
+
+      // OC系
+      if (r.ocCall === 'yes') sd.ocCall++;
+      if (r.ocExt === 'yes') sd.ocExt++;
+      if (r.ocCardiac === 'yes') sd.ocCardiac++;
+    });
+  });
+
+  const staffList = Object.entries(staffData);
+  if (!staffList.length) return '';
+
+  // 現在選択中カテゴリ（グローバル管理）
+  const stateKey = `staffRankCat_${year}`;
+  if (!window._staffRankState) window._staffRankState = {};
+  if (!window._staffRankState[stateKey]) window._staffRankState[stateKey] = 'assist';
+
+  function getRankRows(catId) {
+    const cat = RANK_CATS.find(c=>c.id===catId);
+    if (!cat) return [];
+
+    if (cat.isPeak) {
+      // 最多夜勤TOP3（スタッフではなく夜勤日単位）
+      const allRecs = yearRecs.map(r=>({
+        date: r.date,
+        staff: (r.staff||[]).join('・'),
+        total: Object.values(r.tasks||{}).reduce((s,v)=>s+v,0)+(r.freeTasks||[]).reduce((s,ft)=>s+(ft.count||1),0)
+      })).sort((a,b)=>b.total-a.total).slice(0,3);
+      return allRecs.map((r,i)=>({ rank: i+1, name: `${r.date.slice(5).replace('-','/')} (${r.staff})`, cnt: r.total, unit: '件' }));
+    }
+
+    let rows = [];
+    if (cat.isNights) {
+      rows = staffList.map(([name,sd])=>({ name, cnt: sd.nights }));
+    } else if (cat.isAvg) {
+      rows = staffList.map(([name,sd])=>({ name, cnt: sd.nights ? parseFloat((sd.taskTotal/sd.nights).toFixed(1)) : 0 }));
+    } else if (cat.isOcCall) {
+      rows = staffList.map(([name,sd])=>({ name, cnt: sd.ocCall })).filter(r=>r.cnt>0);
+    } else if (cat.isOcExt) {
+      rows = staffList.filter(([,sd])=>sd.ocExt>0).map(([name,sd])=>({ name, cnt: sd.ocExt }));
+    } else if (cat.isOcCardiac) {
+      rows = staffList.filter(([,sd])=>sd.ocCardiac>0).map(([name,sd])=>({ name, cnt: sd.ocCardiac }));
+    } else {
+      rows = staffList.map(([name,sd])=>({ name, cnt: sd.catCnts[cat.id]||0 })).filter(r=>r.cnt>0);
+    }
+
+    rows.sort((a,b)=>b.cnt-a.cnt);
+    const unit = (cat.isAvg) ? '件/夜勤' : (cat.isNights) ? '回' : (cat.isOcCall||cat.isOcExt||cat.isOcCardiac) ? '回' : '件';
+    return rows.slice(0,10).map((r,i)=>({ rank: i+1, name: r.name, cnt: r.cnt, unit }));
+  }
+
+  const medals = ['🥇','🥈','🥉'];
+
+  function renderRankTable(catId) {
+    const cat = RANK_CATS.find(c=>c.id===catId);
+    const rows = getRankRows(catId);
+    if (!rows.length) return `<div style="color:var(--text-dim);font-size:13px;padding:12px 0">該当データなし</div>`;
+    const maxCnt = rows[0].cnt || 1;
+    return rows.map(r=>`
+      <div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--border)">
+        <div style="width:24px;font-size:${r.rank<=3?'16px':'13px'};text-align:center">${r.rank<=3?medals[r.rank-1]:r.rank}</div>
+        <div style="flex:1;font-size:13px;font-weight:600;color:var(--text)">${r.name}</div>
+        <div style="width:80px">
+          <div style="height:6px;background:var(--border);border-radius:3px;overflow:hidden">
+            <div style="height:100%;width:${Math.round(r.cnt/maxCnt*100)}%;background:${cat.color};border-radius:3px;transition:width 0.3s"></div>
+          </div>
+        </div>
+        <div style="width:56px;text-align:right;font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700;color:${cat.color}">${r.cnt}<span style="font-size:10px;color:var(--text-dim);margin-left:2px">${r.unit}</span></div>
+      </div>`).join('');
+  }
+
+  // ボタングループ（業務系・夜勤系・番外編に分類）
+  const catGroups = [
+    { groupLabel: '業務系', cats: ['assist','emerg','dialysis','resp','surgery'] },
+    { groupLabel: '夜勤系', cats: ['nights','avg','peak'] },
+    { groupLabel: '番外編', cats: ['oc_call','oc_ext','oc_cardiac'] },
+  ];
+
+  const activeCat = window._staffRankState[stateKey];
+  const activeCatObj = RANK_CATS.find(c=>c.id===activeCat);
+
+  let btnHTML = '';
+  catGroups.forEach(grp => {
+    btnHTML += `<div style="font-size:10px;color:var(--text-dim);font-weight:700;margin:8px 0 4px;letter-spacing:0.06em">${grp.groupLabel}</div>`;
+    btnHTML += `<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:2px">`;
+    grp.cats.forEach(cid => {
+      const cat = RANK_CATS.find(c=>c.id===cid);
+      const isActive = cid === activeCat;
+      btnHTML += `<button onclick="selectStaffRankCat('${stateKey}','${cid}')"
+        style="font-size:11px;font-weight:700;padding:5px 10px;border-radius:20px;border:1.5px solid ${isActive?cat.color:'var(--border)'};
+        background:${isActive?cat.color+'18':'var(--surface2)'};color:${isActive?cat.color:'var(--text-muted)'};cursor:pointer;transition:all 0.15s">
+        ${cat.label}</button>`;
+    });
+    btnHTML += `</div>`;
+  });
+
+  const tableHTML = renderRankTable(activeCat);
+
+  return `
+  <div class="card" style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px;margin-bottom:10px">
+    <div class="card-hdr c-purple" style="margin-bottom:12px">🏆 ${year}年 スタッフランキング</div>
+    ${btnHTML}
+    <div style="margin-top:12px;padding:4px 0" id="staff-rank-table-${year}">
+      <div style="font-size:12px;font-weight:800;color:${activeCatObj?activeCatObj.color:'var(--accent)'};margin-bottom:8px">■ ${activeCatObj?activeCatObj.label:''}</div>
+      ${tableHTML}
+    </div>
+  </div>`;
+}
+
+function selectStaffRankCat(stateKey, catId) {
+  if (!window._staffRankState) window._staffRankState = {};
+  window._staffRankState[stateKey] = catId;
+  renderAnnual();
 }
 
 function renderAnnualChart(monthData) {
@@ -3259,6 +3516,94 @@ async function printAnnualReport() {
         hLine(y+8,'#e2e8f0',0.2); y+=9;
       });
     }
+
+    jpText(`作成日：${new Date().toLocaleDateString('ja-JP')}`,M+CW,H-M,7,'#64748b','right');
+
+    // ===== 4ページ：スタッフランキング① =====
+    pdf.addPage(); y=M;
+    jpText(`夜勤業務実績報告　${annualYear}年度（スタッフランキング①）`,M,y,15,'#1a2230'); y+=8;
+    jpText('臨床工学部　CE夜勤業務集計システム',M,y,8,'#64748b'); y+=3;
+    hLine(y,'#1a2230',1); y+=6;
+
+    // スタッフ別集計
+    const staffDataPdf = {};
+    yearRecs.forEach(r=>{
+      const rStaff = r.staff||[];
+      const rTotal = Object.values(r.tasks||{}).reduce((s,v)=>s+v,0)+(r.freeTasks||[]).reduce((s,ft)=>s+(ft.count||1),0);
+      rStaff.forEach(name=>{
+        if(!staffDataPdf[name]) staffDataPdf[name]={nights:0,total:0,assist:0,emerg:0,dialysis:0,resp:0,surgery:0,ocCall:0,ocExt:0,ocCardiac:0,peakTotal:0};
+        const sd=staffDataPdf[name];
+        sd.nights++; sd.total+=rTotal;
+        if(rTotal>sd.peakTotal) sd.peakTotal=rTotal;
+        const tt=r.tasks||{};
+        const aKw=['V-A ECMO開始','V-V ECMO開始','IABP開始','Impella CP開始','Impella 5.5開始'];
+        const eKw=['緊急カテーテル（CAG）','緊急カテーテル（PCI）','緊急カテーテル（EVT）','心筋生検','心嚢穿刺','体外式ペースメーカー挿入'];
+        const dKw=['HD（成人）','HD（小児）','PE（成人）','PE（小児）','PMX（成人）','PMX（小児）','活性炭吸着（成人）','活性炭吸着（小児）','CHDF開始（成人）','CHDF定時チェック（成人）','CHDFトラブル対応（成人）','CHDF回路交換（成人）','CHDF終了（成人）','CHDF開始（小児）','CHDF定時チェック（小児）','CHDFトラブル対応（小児）','CHDF回路交換（小児）','CHDF終了（小児）'];
+        const rKw=['挿管対応（成人）','挿管対応（小児）','挿管対応（新生児）','NPPV導入（成人）','NPPVトラブル対応（成人）','NPPV導入（小児）','NPPVトラブル対応（小児）','HFNC導入（成人）','HFNCトラブル対応（成人）','HFNC導入（小児）','HFNCトラブル対応（小児）','HFNC導入（新生児）','HFNCトラブル対応（新生児）','SiPAP導入','CNO導入','CPAP機対応','人工呼吸器トラブル対応（PB980）','人工呼吸器トラブル対応（V500）','人工呼吸器トラブル対応（Savina300）','人工呼吸器トラブル対応（Monnal T60）','人工呼吸器トラブル対応（VN800/VN500）','人工呼吸器トラブル対応（Vivo45）','人工呼吸器トラブル対応（Torilogy）','人工呼吸器トラブル対応（NKV）','人工呼吸器トラブル対応（その他）','加温加湿器対応','ネブライザ対応（全病棟）','パラパック対応','自動カフ圧計対応','呼吸器転棟・移動対応','NO導入（成人）','NOトラブル対応（成人）','NO導入（小児）','NOトラブル対応（小児）','NO導入（新生児）','NOトラブル対応（新生児）'];
+        const sKw=['コード・ブルー','コード・ピンク','外傷コール（システム1000対応）','外傷コール（対応なし）','ME業務機器対応（その他欄に記載）','緊急心臓外科手術（TEVAR含む）','緊急TAVI（BAV含む）','麻酔器対応','OPE機器対応（その他欄に記載）','セルセーバー（エクストラ）','多職種カンファレンス'];
+        Object.entries(tt).forEach(([n,v])=>{
+          if(aKw.some(k=>n.includes(k))) sd.assist+=v;
+          if(eKw.some(k=>n===k||n.includes(k))) sd.emerg+=v;
+          if(dKw.includes(n)) sd.dialysis+=v;
+          if(rKw.includes(n)) sd.resp+=v;
+          if(sKw.includes(n)) sd.surgery+=v;
+        });
+        if(r.ocCall==='yes') sd.ocCall++;
+        if(r.ocExt==='yes') sd.ocExt++;
+        if(r.ocCardiac==='yes') sd.ocCardiac++;
+      });
+    });
+
+    const staffList2 = Object.entries(staffDataPdf);
+    const medals2 = ['🥇','🥈','🥉'];
+
+    function pdfRankSection(title, color, getVal, unit, top=10) {
+      if(y > H-M-30){ pdf.addPage(); y=M; jpText(`夜勤業務実績報告　${annualYear}年度（スタッフランキング）`,M,y,12,'#1a2230'); y+=10; hLine(y,'#1a2230',0.5); y+=5; }
+      y=sectionHeader(title, y, color); nl(2);
+      const rows = staffList2.map(([name,sd])=>({name,val:getVal(sd)})).filter(r=>r.val>0).sort((a,b)=>b.val-a.val).slice(0,top);
+      if(!rows.length){ jpText('該当データなし',M+2,y,8,'#94a3b8'); y+=6; nl(2); return; }
+      const maxVal2 = rows[0].val||1;
+      rows.forEach((r,i)=>{
+        const medal = i<3 ? ['🥇','🥈','🥉'][i] : String(i+1);
+        jpText(i<3?medal:i+1+'.',M+2,y,i<3?9:8,i<3?['#f59e0b','#94a3b8','#cd7c4a'][i]:'#64748b');
+        jpText(r.name,M+12,y,8,'#1e293b');
+        const bw=Math.max(2,(CW-80)*r.val/maxVal2);
+        setFill(color); pdf.rect(M+55,y+0.5,bw,3.5,'F');
+        jpText(`${r.val}${unit}`,M+CW,y,8,color,'right');
+        hLine(y+5,'#e2e8f0',0.15); y+=5.5;
+      });
+      nl(3);
+    }
+
+    // 業務系ランキング
+    pdfRankSection('■ 補助循環導入 スタッフ別 TOP10','#dc2626',sd=>sd.assist,'件');
+    pdfRankSection('■ 緊急カテーテル対応 スタッフ別 TOP10','#06b6d4',sd=>sd.emerg,'件');
+    pdfRankSection('■ 透析・血液浄化 スタッフ別 TOP10','#3b82f6',sd=>sd.dialysis,'件');
+    pdfRankSection('■ 呼吸管理対応 スタッフ別 TOP10','#16a34a',sd=>sd.resp,'件');
+    pdfRankSection('■ 緊急対応・手術 スタッフ別 TOP10','#ea580c',sd=>sd.surgery,'件');
+
+    // 夜勤系ランキング
+    pdfRankSection('■ 夜勤回数 TOP10','#7c3aed',sd=>sd.nights,'回');
+    pdfRankSection('■ 1夜勤平均業務件数 TOP10','#f59e0b',sd=>sd.nights?parseFloat((sd.total/sd.nights).toFixed(1)):0,'件/夜勤');
+
+    // 業務件数最多夜勤TOP10（日付単位）
+    if(y > H-M-30){ pdf.addPage(); y=M; jpText(`夜勤業務実績報告　${annualYear}年度（スタッフランキング）`,M,y,12,'#1a2230'); y+=10; hLine(y,'#1a2230',0.5); y+=5; }
+    y=sectionHeader('■ 業務件数最多夜勤 TOP10','#1a2230'); nl(2);
+    const peakRecs2=yearRecs.map(r=>({date:r.date,dow:['日','月','火','水','木','金','土'][new Date(r.date+'T00:00:00').getDay()],staff:(r.staff||[]).join('・'),total:Object.values(r.tasks||{}).reduce((s,v)=>s+v,0)+(r.freeTasks||[]).reduce((s,ft)=>s+(ft.count||1),0)})).sort((a,b)=>b.total-a.total).slice(0,10);
+    const maxPeak=peakRecs2.length?peakRecs2[0].total:1;
+    peakRecs2.forEach((r,i)=>{
+      jpText(i<3?['🥇','🥈','🥉'][i]:String(i+1)+'.',M+2,y,i<3?9:8,i<3?['#f59e0b','#94a3b8','#cd7c4a'][i]:'#64748b');
+      jpText(`${r.date.slice(5).replace('-','/')}（${r.dow}）${r.staff}`,M+12,y,8,'#1e293b');
+      const bw2=Math.max(2,(CW-90)*r.total/maxPeak);
+      setFill('#1a2230'); pdf.rect(M+75,y+0.5,bw2,3.5,'F');
+      jpText(`${r.total}件`,M+CW,y,8,'#1e293b','right');
+      hLine(y+5,'#e2e8f0',0.15); y+=5.5;
+    }); nl(3);
+
+    // 番外編
+    pdfRankSection('■ 【番外編】OC担当呼び出し TOP10','#ea580c',sd=>sd.ocCall,'回');
+    pdfRankSection('■ 【番外編】OC外呼び出し TOP10','#dc2626',sd=>sd.ocExt,'回');
+    pdfRankSection('■ 【番外編】心外OC呼び出し TOP10','#7c3aed',sd=>sd.ocCardiac,'回');
 
     jpText(`作成日：${new Date().toLocaleDateString('ja-JP')}`,M+CW,H-M,7,'#64748b','right');
 
