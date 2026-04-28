@@ -2924,7 +2924,7 @@ function buildStaffRankingHTML(yearRecs, year) {
         date: r.date,
         staff: (r.staff||[]).join('・'),
         total: Object.values(r.tasks||{}).reduce((s,v)=>s+v,0)+(r.freeTasks||[]).reduce((s,ft)=>s+(ft.count||1),0)
-      })).sort((a,b)=>b.total-a.total).slice(0,3);
+      })).sort((a,b)=>b.total-a.total).slice(0,5);
       return allRecs.map((r,i)=>({ rank: i+1, name: `${r.date.slice(5).replace('-','/')} (${r.staff})`, cnt: r.total, unit: '件' }));
     }
 
@@ -3204,7 +3204,7 @@ function renderAnnualReport() {
   const slots=sumSlots(yearRecs);
   const slotSum=slots.early+slots.mid+slots.late;
   const top5=Object.entries(taskTot).sort((a,b)=>b[1]-a[1]).slice(0,5);
-  const peakDay=yearRecs.map(r=>({date:r.date,dow:['日','月','火','水','木','金','土'][new Date(r.date+'T00:00:00').getDay()],staff:(r.staff||[]).join('・'),total:Object.values(r.tasks||{}).reduce((s,v)=>s+v,0)+(r.freeTasks||[]).reduce((s,ft)=>s+(ft.count||1),0)})).sort((a,b)=>b.total-a.total).slice(0,3);
+  const peakDay=yearRecs.map(r=>({date:r.date,dow:['日','月','火','水','木','金','土'][new Date(r.date+'T00:00:00').getDay()],staff:(r.staff||[]).join('・'),total:Object.values(r.tasks||{}).reduce((s,v)=>s+v,0)+(r.freeTasks||[]).reduce((s,ft)=>s+(ft.count||1),0)})).sort((a,b)=>b.total-a.total).slice(0,5);
   const extCallerMap={};
   yearRecs.forEach(r=>{ if(r.ocExt==='yes')(r.extCallers||[]).forEach(s=>{ extCallerMap[s]=(extCallerMap[s]||0)+1; }); });
   const cardiacReport=CARDIAC_ONCALL_STAFF.map(n=>({name:n,oncall:yearRecs.filter(r=>(r.cardiacOncall||[]).includes(n)).length,called:yearRecs.filter(r=>(r.cardiacOncall||[]).includes(n)&&r.ocCardiac==='yes').length})).filter(d=>d.oncall>0);
@@ -3399,7 +3399,19 @@ async function printAnnualReport() {
     const slotSum=slots.early+slots.mid+slots.late;
     const top5=Object.entries(taskTot).sort((a,b)=>b[1]-a[1]).slice(0,5);
     const top10=Object.entries(taskTot).sort((a,b)=>b[1]-a[1]).slice(0,10);
-    const peakDays=yearRecs.map(r=>({date:r.date,dow:['日','月','火','水','木','金','土'][new Date(r.date+'T00:00:00').getDay()],staff:(r.staff||[]).join('・'),total:Object.values(r.tasks||{}).reduce((s,v)=>s+v,0)+(r.freeTasks||[]).reduce((s,ft)=>s+(ft.count||1),0)})).sort((a,b)=>b.total-a.total).slice(0,3);
+    const peakDays=yearRecs.map(r=>({date:r.date,dow:['日','月','火','水','木','金','土'][new Date(r.date+'T00:00:00').getDay()],staff:(r.staff||[]).join('・'),total:Object.values(r.tasks||{}).reduce((s,v)=>s+v,0)+(r.freeTasks||[]).reduce((s,ft)=>s+(ft.count||1),0)})).sort((a,b)=>b.total-a.total).slice(0,5);
+    // 年間スタッフ別TOP5集計
+    const annStaffTot={};
+    yearRecs.forEach(r=>{
+      const rTotal=Object.values(r.tasks||{}).reduce((s,v)=>s+v,0)+(r.freeTasks||[]).reduce((s,ft)=>s+(ft.count||1),0);
+      (r.staff||[]).forEach(name=>{
+        if(!annStaffTot[name]) annStaffTot[name]={total:0,nights:0};
+        annStaffTot[name].total+=rTotal; annStaffTot[name].nights++;
+      });
+    });
+    const annStaffTop5=Object.entries(annStaffTot).map(([name,d])=>({
+      name,total:d.total,nights:d.nights,avg:d.nights?(d.total/d.nights).toFixed(1):0
+    })).sort((a,b)=>b.total-a.total).slice(0,5);
     const extCallerMap={};
     yearRecs.forEach(r=>{if(r.ocExt==='yes')(r.extCallers||[]).forEach(s=>{extCallerMap[s]=(extCallerMap[s]||0)+1;});});
     const cardiacReport=CARDIAC_ONCALL_STAFF.map(n=>({name:n,oncall:yearRecs.filter(r=>(r.cardiacOncall||[]).includes(n)).length,called:yearRecs.filter(r=>(r.cardiacOncall||[]).includes(n)&&r.ocCardiac==='yes').length})).filter(d=>d.oncall>0);
@@ -3421,13 +3433,36 @@ async function printAnnualReport() {
     kpiItems.forEach((item,i)=>{const x=M+cw*i;setFill('#f1f5f9');setDraw('#e2e8f0');pdf.setLineWidth(0.2);if(cw>0)pdf.rect(x,y,cw,14,'FD');jpText(item.label,x+cw/2,y+2,6,'#64748b','center');jpText(item.value,x+cw/2,y+6,12,item.color,'center');jpText(item.unit,x+cw/2,y+11,6,'#64748b','center');});
     y+=17;
 
-    y=sectionHeader('■ 年間業務集中日 TOP3',y); nl(2);
+    // 年間業務集中日・スタッフ別 2カラムTOP5
+    const annRankMedals=['🥇','🥈','🥉'];
+    const annRankColors=['#f59e0b','#94a3b8','#cd7c4a','#64748b','#64748b'];
+    const annColW=(CW-6)/2;
+    const annCol2X=M+annColW+6;
+    setFill('#1a2230'); pdf.setLineWidth(0); pdf.rect(M,y,annColW,7,'F');
+    jpText('■ 日付別 TOP5',M+3,y+1.5,8,'#ffffff');
+    setFill('#1a2230'); pdf.rect(annCol2X,y,annColW,7,'F');
+    jpText('■ スタッフ別 TOP5',annCol2X+3,y+1.5,8,'#ffffff');
+    y+=9;
+    const annRankRowH=6;
+    const annStartY=y;
     peakDays.forEach((d,i)=>{
-      jpText(`${i+1}位`,M+2,y,8,['#f59e0b','#94a3b8','#cd7c4a'][i]);
-      jpText(`${d.date.slice(5).replace('-','/')}（${d.dow}）${d.staff}`,M+15,y,8,'#1e293b');
-      jpText(`${d.total}件`,M+CW,y,9,'#3b82f6','right');
-      hLine(y+5,'#e2e8f0',0.2); y+=5.5;
-    }); nl(3);
+      const rc=annRankColors[i];
+      jpText(i<3?annRankMedals[i]:(i+1)+'.',M+1,y,i<3?9:7,rc);
+      jpText(`${d.date.slice(5).replace('-','/')}（${d.dow}）`,M+9,y,7.5,'#1e293b');
+      jpText(d.staff.length>8?d.staff.slice(0,7)+'…':d.staff,M+9,y+4,6.5,'#64748b');
+      jpText(`${d.total}件`,M+annColW,y+1,8,'#3b82f6','right');
+      hLine(y+annRankRowH*1.8,'#e2e8f0',0.15); y+=annRankRowH*1.9;
+    });
+    y=annStartY;
+    annStaffTop5.forEach((d,i)=>{
+      const rc=annRankColors[i];
+      jpText(i<3?annRankMedals[i]:(i+1)+'.',annCol2X+1,y,i<3?9:7,rc);
+      jpText(d.name.length>7?d.name.slice(0,6)+'…':d.name,annCol2X+9,y,7.5,'#1e293b');
+      jpText(`${d.nights}夜勤 avg${d.avg}件`,annCol2X+9,y+4,6,'#64748b');
+      jpText(`${d.total}件`,annCol2X+annColW,y+1,8,'#3b82f6','right');
+      hLine(y+annRankRowH*1.8,'#e2e8f0',0.15); y+=annRankRowH*1.9;
+    });
+    y+=4; nl(2);
 
     y=sectionHeader('■ 業務種別 上位5項目（年間）',y); nl(2);
     const maxT5=top5.length?top5[0][1]:1;
@@ -4235,9 +4270,21 @@ async function printReport() {
     const ocRate = nights ? Math.round(ocCall/nights*100) : 0;
     const extCallerMap = {};
     curRecs.forEach(r=>{ if(r.ocExt==='yes')(r.extCallers||[]).forEach(s=>{ extCallerMap[s]=(extCallerMap[s]||0)+1; }); });
-    const peakDays = [...curRecs].map(r=>({ date:r.date, dow:['日','月','火','水','木','金','土'][new Date(r.date+'T00:00:00').getDay()], staff:(r.staff||[]).join('・'), total:Object.values(r.tasks||{}).reduce((s,v)=>s+v,0)+(r.freeTasks||[]).reduce((s,ft)=>s+(ft.count||1),0) })).sort((a,b)=>b.total-a.total).slice(0,3);
+    const peakDays = [...curRecs].map(r=>({ date:r.date, dow:['日','月','火','水','木','金','土'][new Date(r.date+'T00:00:00').getDay()], staff:(r.staff||[]).join('・'), total:Object.values(r.tasks||{}).reduce((s,v)=>s+v,0)+(r.freeTasks||[]).reduce((s,ft)=>s+(ft.count||1),0) })).sort((a,b)=>b.total-a.total).slice(0,5);
     const top5 = Object.entries(taskTot).sort((a,b)=>b[1]-a[1]).slice(0,5);
     const top10 = Object.entries(taskTot).sort((a,b)=>b[1]-a[1]).slice(0,10);
+    // スタッフ別TOP5集計
+    const staffTot = {};
+    curRecs.forEach(r=>{
+      const rTotal = Object.values(r.tasks||{}).reduce((s,v)=>s+v,0)+(r.freeTasks||[]).reduce((s,ft)=>s+(ft.count||1),0);
+      (r.staff||[]).forEach(name=>{
+        if(!staffTot[name]) staffTot[name]={total:0,nights:0};
+        staffTot[name].total+=rTotal; staffTot[name].nights++;
+      });
+    });
+    const staffTop5 = Object.entries(staffTot).map(([name,d])=>({
+      name, total:d.total, nights:d.nights, avg:d.nights?(d.total/d.nights).toFixed(1):0
+    })).sort((a,b)=>b.total-a.total).slice(0,5);
     const cardiacReport = CARDIAC_ONCALL_STAFF.map(n=>({ name:n, oncall:curRecs.filter(r=>(r.cardiacOncall||[]).includes(n)).length, called:curRecs.filter(r=>(r.cardiacOncall||[]).includes(n)&&r.ocCardiac==='yes').length })).filter(d=>d.oncall>0);
     const allMonths = [...new Set(allRecs.map(r=>r.date.slice(0,7)))].sort().slice(-12);
     const allMonthLabels = allMonths.map(m=>m.slice(5)+'月');
@@ -4261,15 +4308,47 @@ async function printReport() {
       { label:'OC呼び出し', value:String(ocCall), unit:`外:${ocExt}回 心外:${ocCardiacCnt}回`, color:'#dc2626' },
     ], y);
 
-    // 業務集中日TOP3
-    y = sectionHeader('■ 業務集中日 TOP3', y); nl(2);
-    const medals = ['🥇','🥈','🥉'];
+    // 業務集中日・スタッフ別 2カラムTOP5
+    const rankMedals = ['🥇','🥈','🥉'];
+    const rankColors = ['#f59e0b','#94a3b8','#cd7c4a','#64748b','#64748b'];
+    const colW = (CW - 6) / 2;
+    const col2X = M + colW + 6;
+
+    // 左カラムヘッダー
+    setFill('#1a2230'); pdf.setLineWidth(0); pdf.rect(M, y, colW, 7, 'F');
+    jpText('■ 日付別 TOP5', M+3, y+1.5, 8, '#ffffff');
+    // 右カラムヘッダー
+    setFill('#1a2230'); pdf.rect(col2X, y, colW, 7, 'F');
+    jpText('■ スタッフ別 TOP5', col2X+3, y+1.5, 8, '#ffffff');
+    y += 9;
+
+    const rankRowH = 6;
+    const startY = y;
+    // 左カラム：日付別
     peakDays.forEach((d,i) => {
-      jpText(`${i+1}位`, M+2, y, 8, ['#f59e0b','#94a3b8','#cd7c4a'][i]);
-      jpText(`${d.date.slice(5).replace('-','/')}（${d.dow}）${d.staff}`, M+15, y, 8, '#1e293b');
-      jpText(`${d.total}件`, M+CW, y, 9, '#3b82f6', 'right');
-      hLine(y+5, '#e2e8f0', 0.2); y += 5.5;
-    }); nl(3);
+      const rc = rankColors[i];
+      jpText(i<3?rankMedals[i]:(i+1)+'.', M+1, y, i<3?9:7, rc);
+      jpText(`${d.date.slice(5).replace('-','/')}（${d.dow}）`, M+9, y, 7.5, '#1e293b');
+      jpText(d.staff.length>8?d.staff.slice(0,7)+'…':d.staff, M+9, y+4, 6.5, '#64748b');
+      jpText(`${d.total}件`, M+colW, y+1, 8, '#3b82f6', 'right');
+      hLine(y+rankRowH*1.8, '#e2e8f0', 0.15);
+      y += rankRowH * 1.9;
+    });
+
+    // 右カラム：スタッフ別
+    y = startY;
+    staffTop5.forEach((d,i) => {
+      const rc = rankColors[i];
+      jpText(i<3?rankMedals[i]:(i+1)+'.', col2X+1, y, i<3?9:7, rc);
+      jpText(d.name.length>7?d.name.slice(0,6)+'…':d.name, col2X+9, y, 7.5, '#1e293b');
+      jpText(`${d.nights}夜勤 avg${d.avg}件`, col2X+9, y+4, 6, '#64748b');
+      jpText(`${d.total}件`, col2X+colW, y+1, 8, '#3b82f6', 'right');
+      hLine(y+rankRowH*1.8, '#e2e8f0', 0.15);
+      y += rankRowH * 1.9;
+    });
+
+    y += 4;
+    nl(2);
 
     // 業務種別TOP5
     y = sectionHeader('■ 業務種別 上位5項目', y); nl(2);
