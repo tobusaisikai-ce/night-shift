@@ -3361,7 +3361,7 @@ async function printAnnualReport() {
     const barRow = (label, val, maxVal, fy, barColor='#3b82f6', rowH=5.5) => {
       const short = label.length>25?label.slice(0,24)+'…':label;
       jpText(short,M,fy,7.5,'#1e293b');
-      const bw=Math.max(1,(CW-50)*val/maxVal);
+      const bw=maxVal>0&&isFinite(val)?Math.min(CW-50,Math.max(1,(CW-50)*val/maxVal)):1;
       setFill(barColor); pdf.rect(M+50,fy+0.5,bw,rowH-1.5,'F');
       jpText(val+'件',M+CW,fy,7.5,'#64748b','right');
       hLine(fy+rowH,'#e2e8f0',0.2); return fy+rowH;
@@ -3414,7 +3414,7 @@ async function printAnnualReport() {
     // KPI
     const kpiItems=[{label:'年間夜勤回数',value:String(nights),unit:'回',color:'#3b82f6'},{label:'年間総業務件数',value:String(grand),unit:'件',color:'#16a34a'},{label:'1夜勤平均',value:String(avg),unit:'件/夜勤',color:'#ea580c'},{label:'補助循環導入',value:String(assistCnt),unit:'件',color:'#dc2626'},{label:'緊急カテ対応',value:String(emergCnt),unit:'件',color:'#06b6d4'}];
     const cw=CW/kpiItems.length;
-    kpiItems.forEach((item,i)=>{const x=M+cw*i;setFill('#f1f5f9');setDraw('#e2e8f0');pdf.setLineWidth(0.2);pdf.rect(x,y,cw,14,'FD');jpText(item.label,x+cw/2,y+2,6,'#64748b','center');jpText(item.value,x+cw/2,y+6,12,item.color,'center');jpText(item.unit,x+cw/2,y+11,6,'#64748b','center');});
+    kpiItems.forEach((item,i)=>{const x=M+cw*i;setFill('#f1f5f9');setDraw('#e2e8f0');pdf.setLineWidth(0.2);if(cw>0)pdf.rect(x,y,cw,14,'FD');jpText(item.label,x+cw/2,y+2,6,'#64748b','center');jpText(item.value,x+cw/2,y+6,12,item.color,'center');jpText(item.unit,x+cw/2,y+11,6,'#64748b','center');});
     y+=17;
 
     y=sectionHeader('■ 年間業務集中日 TOP3',y); nl(2);
@@ -3433,7 +3433,7 @@ async function printAnnualReport() {
     if(slotSum>0){
       [['準夜（16:30〜22:00）',slots.early,'#3b82f6'],['深夜（22:00〜翌3:30）',slots.mid,'#7c3aed'],['早朝（翌3:30〜9:00）',slots.late,'#06b6d4']].forEach(([l,v,c])=>{
         const pct=Math.round(v/slotSum*100),bw=Math.max(1,(CW-60)*pct/100);
-        jpText(l,M,y,8,'#1e293b'); setFill(c); pdf.rect(M+60,y+0.5,bw,4,'F');
+        jpText(l,M,y,8,'#1e293b'); setFill(c); if(bw>0&&isFinite(bw)) pdf.rect(M+60,y+0.5,bw,4,'F');
         jpText(`${v}件(${pct}%)`,M+CW,y,8,'#64748b','right'); hLine(y+5.5,'#e2e8f0',0.2); y+=6;
       });
     } nl(3);
@@ -3508,9 +3508,9 @@ async function printAnnualReport() {
         const rate=d.oncall?Math.round(d.called/d.oncall*100):0;
         jpText(d.name,M,y,8,'#1e293b');
         const bwO=Math.max(1,(CW-60)*d.oncall/maxOC);
-        setFill('#06b6d4'); pdf.rect(M+30,y+0.5,bwO,3,'F');
-        const bwC=d.called?Math.max(1,(CW-60)*d.called/maxOC):0;
-        setFill('#dc2626'); if(bwC) pdf.rect(M+30,y+4,bwC,3,'F');
+        setFill('#06b6d4'); if(bwO>0&&isFinite(bwO)) pdf.rect(M+30,y+0.5,bwO,3,'F');
+        const bwC=d.called&&maxOC>0?Math.min(CW-60,Math.max(1,(CW-60)*d.called/maxOC)):0;
+        setFill('#dc2626'); if(bwC>0&&isFinite(bwC)) pdf.rect(M+30,y+4,bwC,3,'F');
         jpText(`担当${d.oncall}回`,M+CW-28,y,7,'#06b6d4');
         jpText(`呼出${d.called}回(${rate}%)`,M+CW,y+4,7,'#dc2626','right');
         hLine(y+8,'#e2e8f0',0.2); y+=9;
@@ -3567,7 +3567,7 @@ async function printAnnualReport() {
         const medal = i<3 ? ['🥇','🥈','🥉'][i] : String(i+1);
         jpText(i<3?medal:i+1+'.',M+2,y,i<3?9:8,i<3?['#f59e0b','#94a3b8','#cd7c4a'][i]:'#64748b');
         jpText(r.name,M+12,y,8,'#1e293b');
-        const bw=Math.max(2,(CW-80)*r.val/maxVal2);
+        const bw=isFinite(r.val)&&maxVal2>0 ? Math.min(CW-80, Math.max(2,(CW-80)*r.val/maxVal2)) : 2;
         setFill(color); pdf.rect(M+55,y+0.5,bw,3.5,'F');
         jpText(`${r.val}${unit}`,M+CW,y,8,color,'right');
         hLine(y+5,'#e2e8f0',0.15); y+=5.5;
@@ -3594,7 +3594,7 @@ async function printAnnualReport() {
     peakRecs2.forEach((r,i)=>{
       jpText(i<3?['🥇','🥈','🥉'][i]:String(i+1)+'.',M+2,y,i<3?9:8,i<3?['#f59e0b','#94a3b8','#cd7c4a'][i]:'#64748b');
       jpText(`${r.date.slice(5).replace('-','/')}（${r.dow}）${r.staff}`,M+12,y,8,'#1e293b');
-      const bw2=Math.max(2,(CW-90)*r.total/maxPeak);
+      const bw2=maxPeak>0 ? Math.min(CW-90, Math.max(2,(CW-90)*r.total/maxPeak)) : 2;
       setFill('#1a2230'); pdf.rect(M+75,y+0.5,bw2,3.5,'F');
       jpText(`${r.total}件`,M+CW,y,8,'#1e293b','right');
       hLine(y+5,'#e2e8f0',0.15); y+=5.5;
@@ -4180,9 +4180,9 @@ async function printReport() {
       checkPage(rowH + 2);
       const short = label.length > 25 ? label.slice(0,24)+'…' : label;
       jpText(short, M, fy, 7.5, '#1e293b');
-      const barW = Math.max(1, (CW-50) * val/maxVal);
+      const barW = maxVal>0&&isFinite(val)?Math.min(CW-50,Math.max(1,(CW-50)*val/maxVal)):1;
       setFill(barColor);
-      pdf.rect(M+50, fy+0.5, barW, rowH-1.5, 'F');
+      if(barW>0&&isFinite(barW)) pdf.rect(M+50, fy+0.5, barW, rowH-1.5, 'F');
       jpText(val+'件', M+CW, fy, 7.5, '#64748b', 'right');
       hLine(fy+rowH, '#e2e8f0', 0.2);
       return fy + rowH;
@@ -4273,7 +4273,7 @@ async function printReport() {
         const pct = Math.round(v/slotSum*100);
         const bw = Math.max(1, (CW-60)*pct/100);
         jpText(l, M, y, 8, '#1e293b');
-        setFill(c); pdf.rect(M+60, y+0.5, bw, 4, 'F');
+        setFill(c); if(bw>0&&isFinite(bw)) pdf.rect(M+60, y+0.5, bw, 4, 'F');
         jpText(`${v}件(${pct}%)`, M+CW, y, 8, '#64748b', 'right');
         hLine(y+5.5, '#e2e8f0', 0.2); y += 6;
       });
