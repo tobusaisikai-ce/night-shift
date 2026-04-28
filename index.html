@@ -823,7 +823,7 @@ const TASK_GROUPS = [
   ]},
   { id:'iabp', label:'IABP / Impella', cat:'p', tasks:[
     'IABP開始','IABP終了','IABPトラブル対応',
-    'Impella CP導入','Impella 5.5導入','Impella終了','Impellaトラブル対応',
+    'Impella CP開始','Impella 5.5開始','Impella CP終了','Impella 5.5終了','Impellaトラブル対応',
     '補助循環搬送対応'
   ]},
   { id:'intub', label:'IPPV・NPPV・酸素療法・その他呼吸関連', cat:'c', tasks:[
@@ -1481,7 +1481,93 @@ function sumSlots(recs) {
   return result;
 }
 
-// ===================== HISTORY =====================
+// ===================== 今月の特記業務 =====================
+// taskTot（{taskName: count}）を受け取り、特記業務テキストを返す
+// mode: 'month'=月次 / 'annual'=年次（表現が変わる）
+function buildSpecialReport(taskTot, nights, mode) {
+  const label = mode === 'annual' ? '年間' : '今月';
+
+  // --- 補助循環導入 ---
+  const assistDefs = [
+    { keys: ['V-A ECMO開始'], label: 'V-A ECMO開始' },
+    { keys: ['V-V ECMO開始'], label: 'V-V ECMO開始' },
+    { keys: ['IABP開始'],     label: 'IABP開始' },
+    { keys: ['Impella CP開始'], label: 'Impella CP開始' },
+    { keys: ['Impella 5.5開始'], label: 'Impella 5.5開始' },
+  ];
+  const assistItems = assistDefs.map(d => {
+    const cnt = Object.entries(taskTot).filter(([n])=>d.keys.some(k=>n.includes(k))).reduce((s,[,v])=>s+v,0);
+    return { label: d.label, cnt };
+  }).filter(d => d.cnt > 0);
+  const assistTotal = assistItems.reduce((s,d)=>s+d.cnt,0);
+
+  // --- 緊急カテーテル ---
+  const emergDefs = [
+    { keys: ['緊急カテーテル（CAG）'], label: '緊急CAG' },
+    { keys: ['緊急カテーテル（PCI）'], label: '緊急PCI' },
+    { keys: ['緊急カテーテル（EVT）'], label: '緊急EVT' },
+    { keys: ['心筋生検'],  label: '心筋生検' },
+    { keys: ['心嚢穿刺'],  label: '心嚢穿刺' },
+  ];
+  const emergItems = emergDefs.map(d => {
+    const cnt = Object.entries(taskTot).filter(([n])=>d.keys.some(k=>n.includes(k))).reduce((s,[,v])=>s+v,0);
+    return { label: d.label, cnt };
+  }).filter(d => d.cnt > 0);
+  const emergTotal = emergItems.reduce((s,d)=>s+d.cnt,0);
+
+  // --- 体外式ペースメーカー（別集計） ---
+  const pacingCnt = taskTot['体外式ペースメーカー挿入'] || 0;
+
+  // --- その他特記業務（あった場合のみ） ---
+  const specialDefs = [
+    { key: 'CHDF開始（小児）',           label: '小児CHDF開始' },
+    { key: 'PE',                          label: 'PE（血漿交換）' },
+    { key: '活性炭吸着',                  label: '活性炭吸着' },
+    { key: '経肺圧モニター対応',           label: '経肺圧モニター対応' },
+    { key: 'NO導入（成人）',              label: 'NO導入（成人）' },
+    { key: 'NO導入（小児）',              label: 'NO導入（小児）' },
+    { key: 'NO導入（新生児）',            label: 'NO導入（新生児）' },
+    { key: 'コード・ブルー',               label: 'コード・ブルー' },
+    { key: 'コード・ピンク',               label: 'コード・ピンク' },
+    { key: '外傷コール（システム1000対応）', label: '外傷コール（システム1000対応）' },
+    { key: '外傷コール（対応なし）',        label: '外傷コール（対応なし）' },
+    { key: '緊急心臓外科手術（TEVAR含む）', label: '緊急心臓外科手術' },
+    { key: '緊急TAVI（BAV含む）',          label: '緊急TAVI' },
+    { key: 'セルセーバー（エクストラ）',    label: 'セルセーバー' },
+    { key: '災害対応',                    label: '災害対応' },
+  ];
+  const specialItems = specialDefs.map(d => ({ label: d.label, cnt: taskTot[d.key] || 0 })).filter(d => d.cnt > 0);
+
+  // --- テキスト組み立て ---
+  const lines = [];
+
+  if (assistTotal > 0) {
+    const rate = nights ? Math.round(assistTotal / nights * 100) : 0;
+    lines.push(`・補助循環開始：${assistTotal}件（${label}導入率 ${rate}%）`);
+    assistItems.forEach(d => lines.push(`　  ${d.label}：${d.cnt}件`));
+  }
+
+  if (emergTotal > 0) {
+    const rate = nights ? Math.round(emergTotal / nights * 100) : 0;
+    lines.push(`・緊急カテーテル対応：${emergTotal}件（対応率 ${rate}%）`);
+    emergItems.forEach(d => lines.push(`　  ${d.label}：${d.cnt}件`));
+  }
+
+  if (pacingCnt > 0) {
+    lines.push(`・体外式ペースメーカー挿入：${pacingCnt}件（別集計）`);
+  }
+
+  if (specialItems.length > 0) {
+    lines.push(`・その他特記業務：`);
+    specialItems.forEach(d => lines.push(`　  ${d.label}：${d.cnt}件`));
+  }
+
+  if (lines.length === 0) {
+    lines.push('・特記業務なし');
+  }
+
+  return lines.join('\n');
+}
 function renderHistory() {
   const ym = fmtYM(hMonth);
   const recs = getRecords().filter(r=>r.date&&r.date.startsWith(ym)).sort((a,b)=>b.date.localeCompare(a.date));
@@ -1931,7 +2017,7 @@ function exportXLSX(mode) {
   // ===== 年次専用Sheet: 月別サマリー =====
   if (mode === 'annual') {
     const annualMonths = [...new Set(recs.map(r=>r.date.slice(0,7)))].sort();
-    const assistKwA = ['V-A ECMO開始','V-V ECMO開始','IABP開始','Impella CP導入','Impella 5.5導入'];
+    const assistKwA = ['V-A ECMO開始','V-V ECMO開始','IABP開始','Impella CP開始','Impella 5.5開始'];
     const emergKwA = ['緊急カテーテル','心筋生検','心嚢穿刺'];
     const annualRows = [['月','夜勤回数','総業務件数','1夜勤平均','OC呼び出し','OC外呼び出し','心外OC呼び出し','補助循環導入','緊急カテ対応','準夜件数','深夜件数','早朝件数','最多対応日','最多対応件数']];
     annualMonths.forEach(m=>{
@@ -2150,7 +2236,7 @@ function renderInsights() {
 
 
   // ③ 補助循環導入件数・率
-  const assistCircKw = ['V-A ECMO開始','V-V ECMO開始','IABP開始','Impella CP導入','Impella 5.5導入'];
+  const assistCircKw = ['V-A ECMO開始','V-V ECMO開始','IABP開始','Impella CP開始','Impella 5.5開始'];
   const assistCircCount = Object.entries(curTasks)
     .filter(([n])=>assistCircKw.some(k=>n.includes(k)))
     .reduce((s,[,v])=>s+v,0);
@@ -2516,7 +2602,7 @@ function renderAnnual() {
 
   // 月別集計（最多対応日・補助循環・緊急カテも追加）
   const monthData = [];
-  const assistKwY = ['V-A ECMO開始','V-V ECMO開始','IABP開始','Impella CP導入','Impella 5.5導入'];
+  const assistKwY = ['V-A ECMO開始','V-V ECMO開始','IABP開始','Impella CP開始','Impella 5.5開始'];
   const emergKwY = ['緊急カテーテル','心筋生検','心嚢穿刺'];
   for (let m = 1; m <= 12; m++) {
     const ym = `${annualYear}-${String(m).padStart(2,'0')}`;
@@ -2674,7 +2760,7 @@ function renderAnnualInsight() {
   const yearRecs = allRecs.filter(r=>r.date&&r.date.startsWith(String(annualYear)));
   if (!yearRecs.length) { c.innerHTML=`<div class="empty-state"><div class="ei">📅</div><p>${annualYear}年のデータはありません</p></div>`; return; }
 
-  const assistKw = ['V-A ECMO開始','V-V ECMO開始','IABP開始','Impella CP導入','Impella 5.5導入'];
+  const assistKw = ['V-A ECMO開始','V-V ECMO開始','IABP開始','Impella CP開始','Impella 5.5開始'];
   const emergKw  = ['緊急カテーテル','心筋生検','心嚢穿刺'];
   const taskTot  = {};
   yearRecs.forEach(r=>{ Object.entries(r.tasks||{}).forEach(([n,v])=>taskTot[n]=(taskTot[n]||0)+v); (r.freeTasks||[]).forEach(ft=>{ if(ft.name) taskTot[ft.name]=(taskTot[ft.name]||0)+(ft.count||1); }); });
@@ -2811,7 +2897,7 @@ function renderAnnualReport() {
   const yearRecs = allRecs.filter(r=>r.date&&r.date.startsWith(String(annualYear)));
   if (!yearRecs.length) { c.innerHTML=`<div class="empty-state"><div class="ei">📅</div><p>${annualYear}年のデータはありません</p></div>`; return; }
 
-  const assistKw = ['V-A ECMO開始','V-V ECMO開始','IABP開始','Impella CP導入','Impella 5.5導入'];
+  const assistKw = ['V-A ECMO開始','V-V ECMO開始','IABP開始','Impella CP開始','Impella 5.5開始'];
   const emergKw  = ['緊急カテーテル','心筋生検','心嚢穿刺'];
   const taskTot  = {};
   yearRecs.forEach(r=>{ Object.entries(r.tasks||{}).forEach(([n,v])=>taskTot[n]=(taskTot[n]||0)+v); (r.freeTasks||[]).forEach(ft=>{ if(ft.name) taskTot[ft.name]=(taskTot[ft.name]||0)+(ft.count||1); }); });
@@ -2855,12 +2941,8 @@ ${slotSum>0?`・準夜（16:30〜22:00）：${slots.early}件（${Math.round(slo
 ・深夜（22:00〜翌3:30）：${slots.mid}件（${Math.round(slots.mid/slotSum*100)}%）
 ・早朝（翌3:30〜9:00）：${slots.late}件（${Math.round(slots.late/slotSum*100)}%）`:'・時間帯データ未記録'}
 
-■ 緊急・高難度対応（年間）
-・補助循環導入件数：${assistCnt}件（導入率 ${nights?Math.round(assistCnt/nights*100):0}%）
-  （V-A ECMO・V-V ECMO・IABP・Impella 開始・導入の合計）
-・緊急カテーテル対応件数：${emergCnt}件（対応率 ${nights?Math.round(emergCnt/nights*100):0}%）
-  （緊急CAG/PCI/EVT・心筋生検・心嚢穿刺の合計）
-・体外式ペースメーカー挿入：${pacingCnt}件（別集計）
+■ 今年の特記業務（年間）
+${buildSpecialReport(taskTot, nights, 'annual')}
 
 ■ オンコール状況（年間）
 ・オンコール担当呼び出し：${ocCallCnt}回（呼び出し率 ${nights?Math.round(ocCallCnt/nights*100):0}%）
@@ -3009,7 +3091,7 @@ async function printAnnualReport() {
     yearRecs.forEach(r=>{ Object.entries(r.tasks||{}).forEach(([n,v])=>taskTot[n]=(taskTot[n]||0)+v); (r.freeTasks||[]).forEach(ft=>{if(ft.name)taskTot[ft.name]=(taskTot[ft.name]||0)+(ft.count||1);}); });
     const grand=Object.values(taskTot).reduce((s,v)=>s+v,0);
     const avg=nights?(grand/nights).toFixed(1):0;
-    const assistKw=['V-A ECMO開始','V-V ECMO開始','IABP開始','Impella CP導入','Impella 5.5導入'];
+    const assistKw=['V-A ECMO開始','V-V ECMO開始','IABP開始','Impella CP開始','Impella 5.5開始'];
     const emergKw=['緊急カテーテル','心筋生検','心嚢穿刺'];
     const assistCnt=Object.entries(taskTot).filter(([n])=>assistKw.some(k=>n.includes(k))).reduce((s,[,v])=>s+v,0);
     const emergCnt=Object.entries(taskTot).filter(([n])=>emergKw.some(k=>n.includes(k))).reduce((s,[,v])=>s+v,0);
@@ -3017,8 +3099,7 @@ async function printAnnualReport() {
     const ocCall=yearRecs.filter(r=>r.ocCall==='yes').length;
     const ocExt=yearRecs.filter(r=>r.ocExt==='yes').length;
     const ocCardiacCnt=yearRecs.filter(r=>r.ocCardiac==='yes').length;
-    const slots={early:0,mid:0,late:0};
-    yearRecs.forEach(r=>{if(r.taskSlots)Object.values(r.taskSlots).forEach(s=>{slots.early+=s.early||0;slots.mid+=s.mid||0;slots.late+=s.late||0;});});
+    const slots=sumSlots(yearRecs);
     const slotSum=slots.early+slots.mid+slots.late;
     const top5=Object.entries(taskTot).sort((a,b)=>b[1]-a[1]).slice(0,5);
     const top10=Object.entries(taskTot).sort((a,b)=>b[1]-a[1]).slice(0,10);
@@ -3065,8 +3146,12 @@ async function printAnnualReport() {
       });
     } nl(3);
 
-    y=sectionHeader('■ 緊急・高難度対応（年間）',y,'#dc2626'); nl(2);
-    [`補助循環導入：${assistCnt}件（導入率 ${nights?Math.round(assistCnt/nights*100):0}%）`,`緊急カテーテル対応：${emergCnt}件（対応率 ${nights?Math.round(emergCnt/nights*100):0}%）`,`体外式ペースメーカー挿入：${pacingCnt}件（別集計）`].forEach(t=>{jpText(t,M+2,y,8,'#1e293b');y+=5;}); nl(2);
+    y=sectionHeader('■ 今年の特記業務（年間）',y,'#dc2626'); nl(2);
+    buildSpecialReport(taskTot, nights, 'annual').split('\n').forEach(line=>{
+      const isDetail = line.startsWith('　');
+      jpText(line.trimStart(), M+(isDetail?8:2), y, isDetail?7.5:8, isDetail?'#64748b':'#dc2626');
+      y += isDetail?4.5:5;
+    }); nl(2);
 
     y=sectionHeader('■ オンコール状況（年間）',y); nl(2);
     jpText(`OC担当呼び出し：${ocCall}回（呼び出し率 ${nights?Math.round(ocCall/nights*100):0}%）`,M+2,y,8,'#1e293b'); y+=5;
@@ -3210,7 +3295,7 @@ function renderReport() {
 
   // 緊急業務
   // 補助循環導入
-  const assistKw = ['V-A ECMO開始','V-V ECMO開始','IABP開始','Impella CP導入','Impella 5.5導入'];
+  const assistKw = ['V-A ECMO開始','V-V ECMO開始','IABP開始','Impella CP開始','Impella 5.5開始'];
   const assistCnt = Object.entries(taskTot).filter(([n])=>assistKw.some(k=>n.includes(k))).reduce((s,[,v])=>s+v,0);
   // 緊急カテーテル・ペーシング
   const emergKw = ['緊急カテーテル','心筋生検','心嚢穿刺'];
@@ -3258,12 +3343,8 @@ ${slotSum > 0 ? `・準夜（16:30〜22:00）：${slots.early}件（${Math.round
 ・深夜（22:00〜翌3:30）：${slots.mid}件（${Math.round(slots.mid/slotSum*100)}%）
 ・早朝（翌3:30〜9:00）：${slots.late}件（${Math.round(slots.late/slotSum*100)}%）` : '・時間帯データ未記録'}
 
-■ 緊急・高難度対応
-・補助循環導入件数：${assistCnt}件（導入率 ${curRecs.length?Math.round(assistCnt/curRecs.length*100):0}%）
-  （V-A ECMO・V-V ECMO・IABP・Impella 開始・導入の合計）
-・緊急カテーテル対応件数：${emergCnt}件（対応率 ${curRecs.length?Math.round(emergCnt/curRecs.length*100):0}%）
-  （緊急CAG/PCI/EVT・心筋生検・心嚢穿刺の合計）
-・体外式ペースメーカー挿入：${pacingCnt}件（別集計）
+■ 今月の特記業務
+${buildSpecialReport(taskTot, curRecs.length, 'month')}
 
 ■ オンコール状況
 ・オンコール担当呼び出し：${ocCall}回（呼び出し率 ${ocRate}%）
@@ -3404,7 +3485,7 @@ function drawEmergChart(allRecs) {
   const canvas = document.getElementById('chart-emerg');
   if (!canvas) return;
   const {ctx,w,h} = initCanvas(canvas);
-  const assistKw = ['V-A ECMO開始','V-V ECMO開始','IABP開始','Impella CP導入','Impella 5.5導入'];
+  const assistKw = ['V-A ECMO開始','V-V ECMO開始','IABP開始','Impella CP開始','Impella 5.5開始'];
   const emergKw  = ['緊急カテーテル','心筋生検','心嚢穿刺'];
   const months = [...new Set(allRecs.map(r=>r.date.slice(0,7)))].sort().slice(-12);
   if (!months.length) { ctx.fillStyle='#94a3b8'; ctx.font='12px sans-serif'; ctx.fillText('データなし',w/2-30,h/2); return; }
@@ -3753,7 +3834,7 @@ async function printReport() {
     curRecs.forEach(r=>{ Object.entries(r.tasks||{}).forEach(([n,v])=>taskTot[n]=(taskTot[n]||0)+v); (r.freeTasks||[]).forEach(ft=>{ if(ft.name) taskTot[ft.name]=(taskTot[ft.name]||0)+(ft.count||1); }); });
     const slots = sumSlots(curRecs);
     const slotSum = slots.early+slots.mid+slots.late;
-    const assistKw = ['V-A ECMO開始','V-V ECMO開始','IABP開始','Impella CP導入','Impella 5.5導入'];
+    const assistKw = ['V-A ECMO開始','V-V ECMO開始','IABP開始','Impella CP開始','Impella 5.5開始'];
     const emergKw  = ['緊急カテーテル','心筋生検','心嚢穿刺'];
     const assistCnt = Object.entries(taskTot).filter(([n])=>assistKw.some(k=>n.includes(k))).reduce((s,[,v])=>s+v,0);
     const emergCnt  = Object.entries(taskTot).filter(([n])=>emergKw.some(k=>n.includes(k))).reduce((s,[,v])=>s+v,0);
@@ -3821,15 +3902,15 @@ async function printReport() {
     }
     nl(3);
 
-    // 緊急対応
-    y = sectionHeader('■ 緊急・高難度対応', y, '#dc2626'); nl(2);
-    [
-      [`補助循環導入：${assistCnt}件（導入率 ${nights?Math.round(assistCnt/nights*100):0}%）`, '#dc2626'],
-      [`　(V-A ECMO・V-V ECMO・IABP・Impella 開始・導入の合計)`, '#64748b'],
-      [`緊急カテーテル対応：${emergCnt}件（対応率 ${nights?Math.round(emergCnt/nights*100):0}%）`, '#dc2626'],
-      [`　(緊急CAG/PCI/EVT・心筋生検・心嚢穿刺の合計)`, '#64748b'],
-      [`体外式ペースメーカー挿入：${pacingCnt}件（別集計）`, '#ea580c'],
-    ].forEach(([t,c]) => { jpText(t, M+2, y, 8, c); y += 5; }); nl(2);
+    // 今月の特記業務
+    y = sectionHeader('■ 今月の特記業務', y, '#dc2626'); nl(2);
+    const specialLines = buildSpecialReport(taskTot, nights, 'month').split('\n');
+    specialLines.forEach(line => {
+      const isDetail = line.startsWith('　');
+      jpText(line.trimStart(), M + (isDetail ? 8 : 2), y, isDetail ? 7.5 : 8, isDetail ? '#64748b' : '#dc2626');
+      y += isDetail ? 4.5 : 5;
+    });
+    nl(2);
 
     // OC状況
     y = sectionHeader('■ オンコール状況', y); nl(2);
