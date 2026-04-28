@@ -2632,7 +2632,7 @@ let annualYear = new Date().getFullYear();
 function updateLabels() {
   document.getElementById('h-month-lbl').textContent=fmtYMDisp(hMonth);
   document.getElementById('s-month-lbl').textContent=fmtYMDisp(sMonth);
-  document.getElementById('annual-year-lbl').textContent = annualYear + '年';
+  document.getElementById('annual-year-lbl').textContent = annualYear + '年度';
 }
 
 let currentAnnualView = 'stats';
@@ -2652,7 +2652,7 @@ function switchAnnualView(view) {
 
 function changeYear(d) {
   annualYear += d;
-  document.getElementById('annual-year-lbl').textContent = annualYear + '年';
+  document.getElementById('annual-year-lbl').textContent = annualYear + '年度';
   renderAnnual();
   if (currentAnnualView==='insight') renderAnnualInsight();
   if (currentAnnualView==='report') renderAnnualReport();
@@ -2661,7 +2661,9 @@ function changeYear(d) {
 function renderAnnual() {
   const c = document.getElementById('annual-content');
   const allRecs = getRecords();
-  const yearRecs = allRecs.filter(r=>r.date && r.date.startsWith(String(annualYear)));
+  const fyStart = String(annualYear) + '-04-01';
+  const fyEnd   = String(annualYear+1) + '-03-31';
+  const yearRecs = allRecs.filter(r=>r.date && r.date >= fyStart && r.date <= fyEnd);
 
   if (!yearRecs.length) {
     c.innerHTML = `<div class="empty-state"><div class="ei">📅</div><p>${annualYear}年のデータはありません</p></div>`;
@@ -3065,7 +3067,7 @@ function renderAnnualInsight() {
   const ocExtCnt = yearRecs.filter(r=>r.ocExt==='yes').length;
   const slots    = sumSlots(yearRecs);
   const top3     = Object.entries(taskTot).sort((a,b)=>b[1]-a[1]).slice(0,3);
-  const months   = [...Array(12)].map((_,i)=>String(annualYear)+'-'+String(i+1).padStart(2,'0'));
+  const months   = [...Array(12)].map((_,i)=>{ const m=(i+3)%12+1; const y=m>=4?annualYear:annualYear+1; return String(y)+'-'+String(m).padStart(2,'0'); });
   const monthLabels = months.map(m=>m.slice(5)+'月');
   const monthGrands = months.map(m=>yearRecs.filter(r=>r.date.startsWith(m)).reduce((s,r)=>s+Object.values(r.tasks||{}).reduce((a,v)=>a+v,0)+(r.freeTasks||[]).reduce((a,ft)=>a+(ft.count||1),0),0));
   const monthAssist = months.map(m=>{ const tt={}; yearRecs.filter(r=>r.date.startsWith(m)).forEach(r=>Object.entries(r.tasks||{}).forEach(([n,v])=>tt[n]=(tt[n]||0)+v)); return Object.entries(tt).filter(([n])=>assistKw.some(k=>n.includes(k))).reduce((s,[,v])=>s+v,0); });
@@ -3205,7 +3207,7 @@ function renderAnnualReport() {
   const extCallerMap={};
   yearRecs.forEach(r=>{ if(r.ocExt==='yes')(r.extCallers||[]).forEach(s=>{ extCallerMap[s]=(extCallerMap[s]||0)+1; }); });
   const cardiacReport=CARDIAC_ONCALL_STAFF.map(n=>({name:n,oncall:yearRecs.filter(r=>(r.cardiacOncall||[]).includes(n)).length,called:yearRecs.filter(r=>(r.cardiacOncall||[]).includes(n)&&r.ocCardiac==='yes').length})).filter(d=>d.oncall>0);
-  const months=[...Array(12)].map((_,i)=>String(annualYear)+'-'+String(i+1).padStart(2,'0'));
+  const months=[...Array(12)].map((_,i)=>{ const m=(i+3)%12+1; const y=m>=4?annualYear:annualYear+1; return String(y)+'-'+String(m).padStart(2,'0'); });
   const monthLabels=months.map(m=>m.slice(5)+'月');
   const monthGrands=months.map(m=>yearRecs.filter(r=>r.date.startsWith(m)).reduce((s,r)=>s+Object.values(r.tasks||{}).reduce((a,v)=>a+v,0)+(r.freeTasks||[]).reduce((a,ft)=>a+(ft.count||1),0),0));
   const monthAssist=months.map(m=>{ const tt={}; yearRecs.filter(r=>r.date.startsWith(m)).forEach(r=>Object.entries(r.tasks||{}).forEach(([n,v])=>tt[n]=(tt[n]||0)+v)); return Object.entries(tt).filter(([n])=>assistKw.some(k=>n.includes(k))).reduce((s,[,v])=>s+v,0); });
@@ -3260,7 +3262,7 @@ CE夜勤業務集計システム
     <div id="annual-report-print-area">
       <div class="report-page">
         <div class="report-page-header">
-          <div class="report-page-title">夜勤業務実績報告　${annualYear}年度 年次</div>
+          <div class="report-page-title">夜勤業務実績報告　${annualYear}年度</div>
           <div class="report-page-sub">臨床工学部　CE夜勤業務集計システム</div>
         </div>
         <div class="report-text-editable" id="annual-report-text-area" contenteditable="true">${reportText.replace(/\n/g,'<br>').replace(/ /g,'&nbsp;')}</div>
@@ -3354,8 +3356,9 @@ async function printAnnualReport() {
     };
 
     const sectionHeader = (title, fy, bg='#1a2230') => {
-      setFill(bg); pdf.setLineWidth(0); pdf.rect(M,fy,CW,7,'F');
-      jpText(title,M+3,fy+1.5,9,'#ffffff'); return fy+8;
+      const safeY = (isFinite(fy)&&fy>0) ? fy : y;
+      setFill(bg); pdf.setLineWidth(0); pdf.rect(M,safeY,CW,7,'F');
+      jpText(title,M+3,safeY+1.5,9,'#ffffff'); return safeY+8;
     };
 
     const barRow = (label, val, maxVal, fy, barColor='#3b82f6', rowH=5.5) => {
@@ -3399,7 +3402,7 @@ async function printAnnualReport() {
     const extCallerMap={};
     yearRecs.forEach(r=>{if(r.ocExt==='yes')(r.extCallers||[]).forEach(s=>{extCallerMap[s]=(extCallerMap[s]||0)+1;});});
     const cardiacReport=CARDIAC_ONCALL_STAFF.map(n=>({name:n,oncall:yearRecs.filter(r=>(r.cardiacOncall||[]).includes(n)).length,called:yearRecs.filter(r=>(r.cardiacOncall||[]).includes(n)&&r.ocCardiac==='yes').length})).filter(d=>d.oncall>0);
-    const months=[...Array(12)].map((_,i)=>String(annualYear)+'-'+String(i+1).padStart(2,'0'));
+    const months=[...Array(12)].map((_,i)=>{ const m=(i+3)%12+1; const y=m>=4?annualYear:annualYear+1; return String(y)+'-'+String(m).padStart(2,'0'); });
     const monthLabels=months.map(m=>m.slice(5)+'月');
     const monthGrands=months.map(m=>yearRecs.filter(r=>r.date.startsWith(m)).reduce((s,r)=>s+Object.values(r.tasks||{}).reduce((a,v)=>a+v,0)+(r.freeTasks||[]).reduce((a,ft)=>a+(ft.count||1),0),0));
     const monthAssist=months.map(m=>{const tt={};yearRecs.filter(r=>r.date.startsWith(m)).forEach(r=>Object.entries(r.tasks||{}).forEach(([n,v])=>tt[n]=(tt[n]||0)+v));return Object.entries(tt).filter(([n])=>assistKw.some(k=>n.includes(k))).reduce((s,[,v])=>s+v,0);});
@@ -3407,7 +3410,7 @@ async function printAnnualReport() {
     const monthOC=months.map(m=>{const mr=yearRecs.filter(r=>r.date.startsWith(m));return mr.length?Math.round(mr.filter(r=>r.ocCall==='yes').length/mr.length*100):0;});
 
     // ===== 1ページ =====
-    jpText(`夜勤業務実績報告　${annualYear}年度 年次`,M,y,15,'#1a2230'); y+=8;
+    jpText(`夜勤業務実績報告　${annualYear}年度`,M,y,15,'#1a2230'); y+=8;
     jpText('臨床工学部　CE夜勤業務集計システム',M,y,8,'#64748b'); y+=3;
     hLine(y,'#1a2230',1); y+=5;
 
@@ -3521,7 +3524,7 @@ async function printAnnualReport() {
 
     // ===== 4ページ：スタッフランキング① =====
     pdf.addPage(); y=M;
-    jpText(`夜勤業務実績報告　${annualYear}年度（スタッフランキング①）`,M,y,15,'#1a2230'); y+=8;
+    jpText(`夜勤業務実績報告　${annualYear}年度（スタッフランキング）`,M,y,15,'#1a2230'); y+=8;
     jpText('臨床工学部　CE夜勤業務集計システム',M,y,8,'#64748b'); y+=3;
     hLine(y,'#1a2230',1); y+=6;
 
@@ -3558,21 +3561,26 @@ async function printAnnualReport() {
     const medals2 = ['🥇','🥈','🥉'];
 
     function pdfRankSection(title, color, getVal, unit, top=10) {
-      if(y > H-M-30){ pdf.addPage(); y=M; jpText(`夜勤業務実績報告　${annualYear}年度（スタッフランキング）`,M,y,12,'#1a2230'); y+=10; hLine(y,'#1a2230',0.5); y+=5; }
+      if(!isFinite(y)||y > H-M-30){ pdf.addPage(); y=M; jpText(`夜勤業務実績報告　${annualYear}年度（スタッフランキング）`,M,y,12,'#1a2230'); y+=10; hLine(y,'#1a2230',0.5); y+=5; }
       y=sectionHeader(title, y, color); nl(2);
-      const rows = staffList2.map(([name,sd])=>({name,val:getVal(sd)})).filter(r=>r.val>0).sort((a,b)=>b.val-a.val).slice(0,top);
-      if(!rows.length){ jpText('該当データなし',M+2,y,8,'#94a3b8'); y+=6; nl(2); return; }
-      const maxVal2 = rows[0].val||1;
-      rows.forEach((r,i)=>{
-        const medal = i<3 ? ['🥇','🥈','🥉'][i] : String(i+1);
-        jpText(i<3?medal:i+1+'.',M+2,y,i<3?9:8,i<3?['#f59e0b','#94a3b8','#cd7c4a'][i]:'#64748b');
+      const rawRows = staffList2.map(([name,sd])=>{
+        const rawVal = getVal(sd);
+        const val = (typeof rawVal === 'number' && isFinite(rawVal) && !isNaN(rawVal)) ? rawVal : 0;
+        return {name, val};
+      }).filter(r=>r.val>0).sort((a,b)=>b.val-a.val).slice(0,top);
+      if(!rawRows.length){ jpText('該当データなし',M+2,y,8,'#94a3b8'); y+=6; y+=3; return; }
+      const maxVal2 = rawRows[0].val > 0 ? rawRows[0].val : 1;
+      rawRows.forEach((r,i)=>{
+        if(y > H-M-10){ pdf.addPage(); y=M+15; }
+        jpText(i<3?['🥇','🥈','🥉'][i]:(i+1)+'.',M+2,y,i<3?9:8,i<3?['#f59e0b','#94a3b8','#cd7c4a'][i]:'#64748b');
         jpText(r.name,M+12,y,8,'#1e293b');
-        const bw=isFinite(r.val)&&maxVal2>0 ? Math.min(CW-80, Math.max(2,(CW-80)*r.val/maxVal2)) : 2;
-        setFill(color); pdf.rect(M+55,y+0.5,bw,3.5,'F');
+        const bwRaw = (CW-80) * r.val / maxVal2;
+        const bw = Math.min(CW-80, Math.max(2, isFinite(bwRaw)?bwRaw:2));
+        setFill(color); pdf.rect(M+55, y+0.5, bw, 3.5, 'F');
         jpText(`${r.val}${unit}`,M+CW,y,8,color,'right');
         hLine(y+5,'#e2e8f0',0.15); y+=5.5;
       });
-      nl(3);
+      y += 3;
     }
 
     // 業務系ランキング
@@ -3587,7 +3595,7 @@ async function printAnnualReport() {
     pdfRankSection('■ 1夜勤平均業務件数 TOP10','#f59e0b',sd=>sd.nights?parseFloat((sd.total/sd.nights).toFixed(1)):0,'件/夜勤');
 
     // 業務件数最多夜勤TOP10（日付単位）
-    if(y > H-M-30){ pdf.addPage(); y=M; jpText(`夜勤業務実績報告　${annualYear}年度（スタッフランキング）`,M,y,12,'#1a2230'); y+=10; hLine(y,'#1a2230',0.5); y+=5; }
+    if(!isFinite(y)||y > H-M-30){ pdf.addPage(); y=M; jpText(`夜勤業務実績報告　${annualYear}年度（スタッフランキング）`,M,y,12,'#1a2230'); y+=10; hLine(y,'#1a2230',0.5); y+=5; }
     y=sectionHeader('■ 業務件数最多夜勤 TOP10','#1a2230'); nl(2);
     const peakRecs2=yearRecs.map(r=>({date:r.date,dow:['日','月','火','水','木','金','土'][new Date(r.date+'T00:00:00').getDay()],staff:(r.staff||[]).join('・'),total:Object.values(r.tasks||{}).reduce((s,v)=>s+v,0)+(r.freeTasks||[]).reduce((s,ft)=>s+(ft.count||1),0)})).sort((a,b)=>b.total-a.total).slice(0,10);
     const maxPeak=peakRecs2.length?peakRecs2[0].total:1;
@@ -4150,11 +4158,12 @@ async function printReport() {
     };
 
     const sectionHeader = (title, fy, bg='#1a2230') => {
+      const safeY = (isFinite(fy)&&fy>0) ? fy : y;
       checkPage(12);
       setFill(bg); pdf.setLineWidth(0);
-      pdf.rect(M, fy, CW, 7, 'F');
-      jpText(title, M+3, fy+1.5, 9, '#ffffff');
-      return fy + 8;
+      pdf.rect(M, safeY, CW, 7, 'F');
+      jpText(title, M+3, safeY+1.5, 9, '#ffffff');
+      return safeY + 8;
     };
 
     const kpiCards = (items, fy, cardH=14) => {
@@ -4163,7 +4172,7 @@ async function printReport() {
         const x = M + cw * i;
         setFill('#f1f5f9'); setDraw('#e2e8f0');
         pdf.setLineWidth(0.2);
-        pdf.rect(x, fy, cw, cardH, 'FD');
+        if(isFinite(x)&&isFinite(fy)&&cw>0&&cardH>0) pdf.rect(x, fy, cw, cardH, 'FD');
         jpText(item.label, x + cw/2, fy+2, 7, '#64748b', 'center');
         jpText(item.value, x + cw/2, fy+6, 13, item.color, 'center');
         jpText(item.unit, x + cw/2, fy+11, 7, '#64748b', 'center');
