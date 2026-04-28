@@ -2632,7 +2632,7 @@ let annualYear = new Date().getFullYear();
 function updateLabels() {
   document.getElementById('h-month-lbl').textContent=fmtYMDisp(hMonth);
   document.getElementById('s-month-lbl').textContent=fmtYMDisp(sMonth);
-  document.getElementById('annual-year-lbl').textContent = annualYear + '年度';
+  document.getElementById('annual-year-lbl').textContent = annualYear + '年度（' + annualYear + '/4〜' + (annualYear+1) + '/3）';
 }
 
 let currentAnnualView = 'stats';
@@ -2652,7 +2652,7 @@ function switchAnnualView(view) {
 
 function changeYear(d) {
   annualYear += d;
-  document.getElementById('annual-year-lbl').textContent = annualYear + '年度';
+  document.getElementById('annual-year-lbl').textContent = annualYear + '年度（' + annualYear + '/4〜' + (annualYear+1) + '/3）';
   renderAnnual();
   if (currentAnnualView==='insight') renderAnnualInsight();
   if (currentAnnualView==='report') renderAnnualReport();
@@ -2674,23 +2674,24 @@ function renderAnnual() {
   const monthData = [];
   const assistKwY = ['V-A ECMO開始','V-V ECMO開始','IABP開始','Impella CP開始','Impella 5.5開始'];
   const emergKwY = ['緊急カテーテル','心筋生検','心嚢穿刺'];
-  for (let m = 1; m <= 12; m++) {
-    const ym = `${annualYear}-${String(m).padStart(2,'0')}`;
+  // 年度：4月〜翌3月の順で12ヶ月
+  const fyMonths = [4,5,6,7,8,9,10,11,12,1,2,3];
+  fyMonths.forEach(m => {
+    const y = m >= 4 ? annualYear : annualYear + 1;
+    const ym = `${y}-${String(m).padStart(2,'0')}`;
     const mr = yearRecs.filter(r=>r.date.startsWith(ym));
     const tasks = mr.reduce((s,r)=>s+Object.values(r.tasks||{}).reduce((a,v)=>a+v,0)+(r.freeTasks||[]).reduce((a,ft)=>a+(ft.count||1),0),0);
-    // 最多対応日
     const peakDay = mr.map(r=>({
       date:r.date,
       dow:['日','月','火','水','木','金','土'][new Date(r.date+'T00:00:00').getDay()],
       total:Object.values(r.tasks||{}).reduce((s,v)=>s+v,0)+(r.freeTasks||[]).reduce((s,ft)=>s+(ft.count||1),0)
     })).sort((a,b)=>b.total-a.total)[0];
-    // 補助循環・緊急カテ
     const taskTotM = {};
     mr.forEach(r=>{ Object.entries(r.tasks||{}).forEach(([n,v])=>taskTotM[n]=(taskTotM[n]||0)+v); });
     const assistM = Object.entries(taskTotM).filter(([n])=>assistKwY.some(k=>n.includes(k))).reduce((s,[,v])=>s+v,0);
     const emergM = Object.entries(taskTotM).filter(([n])=>emergKwY.some(k=>n.includes(k))).reduce((s,[,v])=>s+v,0);
     monthData.push({ m, ym, label: m+'月', nights: mr.length, tasks, peakDay, assistM, emergM });
-  }
+  });
 
   // 年間サマリー
   const totalNights = monthData.reduce((s,d)=>s+d.nights,0);
@@ -3067,7 +3068,7 @@ function renderAnnualInsight() {
   const ocExtCnt = yearRecs.filter(r=>r.ocExt==='yes').length;
   const slots    = sumSlots(yearRecs);
   const top3     = Object.entries(taskTot).sort((a,b)=>b[1]-a[1]).slice(0,3);
-  const months   = [...Array(12)].map((_,i)=>{ const m=(i+3)%12+1; const y=m>=4?annualYear:annualYear+1; return String(y)+'-'+String(m).padStart(2,'0'); });
+  const months   = [4,5,6,7,8,9,10,11,12,1,2,3].map(m=>{ const y=m>=4?annualYear:annualYear+1; return String(y)+'-'+String(m).padStart(2,'0'); });
   const monthLabels = months.map(m=>m.slice(5)+'月');
   const monthGrands = months.map(m=>yearRecs.filter(r=>r.date.startsWith(m)).reduce((s,r)=>s+Object.values(r.tasks||{}).reduce((a,v)=>a+v,0)+(r.freeTasks||[]).reduce((a,ft)=>a+(ft.count||1),0),0));
   const monthAssist = months.map(m=>{ const tt={}; yearRecs.filter(r=>r.date.startsWith(m)).forEach(r=>Object.entries(r.tasks||{}).forEach(([n,v])=>tt[n]=(tt[n]||0)+v)); return Object.entries(tt).filter(([n])=>assistKw.some(k=>n.includes(k))).reduce((s,[,v])=>s+v,0); });
@@ -3207,7 +3208,7 @@ function renderAnnualReport() {
   const extCallerMap={};
   yearRecs.forEach(r=>{ if(r.ocExt==='yes')(r.extCallers||[]).forEach(s=>{ extCallerMap[s]=(extCallerMap[s]||0)+1; }); });
   const cardiacReport=CARDIAC_ONCALL_STAFF.map(n=>({name:n,oncall:yearRecs.filter(r=>(r.cardiacOncall||[]).includes(n)).length,called:yearRecs.filter(r=>(r.cardiacOncall||[]).includes(n)&&r.ocCardiac==='yes').length})).filter(d=>d.oncall>0);
-  const months=[...Array(12)].map((_,i)=>{ const m=(i+3)%12+1; const y=m>=4?annualYear:annualYear+1; return String(y)+'-'+String(m).padStart(2,'0'); });
+  const months=[4,5,6,7,8,9,10,11,12,1,2,3].map(m=>{ const y=m>=4?annualYear:annualYear+1; return String(y)+'-'+String(m).padStart(2,'0'); });
   const monthLabels=months.map(m=>m.slice(5)+'月');
   const monthGrands=months.map(m=>yearRecs.filter(r=>r.date.startsWith(m)).reduce((s,r)=>s+Object.values(r.tasks||{}).reduce((a,v)=>a+v,0)+(r.freeTasks||[]).reduce((a,ft)=>a+(ft.count||1),0),0));
   const monthAssist=months.map(m=>{ const tt={}; yearRecs.filter(r=>r.date.startsWith(m)).forEach(r=>Object.entries(r.tasks||{}).forEach(([n,v])=>tt[n]=(tt[n]||0)+v)); return Object.entries(tt).filter(([n])=>assistKw.some(k=>n.includes(k))).reduce((s,[,v])=>s+v,0); });
@@ -3402,7 +3403,7 @@ async function printAnnualReport() {
     const extCallerMap={};
     yearRecs.forEach(r=>{if(r.ocExt==='yes')(r.extCallers||[]).forEach(s=>{extCallerMap[s]=(extCallerMap[s]||0)+1;});});
     const cardiacReport=CARDIAC_ONCALL_STAFF.map(n=>({name:n,oncall:yearRecs.filter(r=>(r.cardiacOncall||[]).includes(n)).length,called:yearRecs.filter(r=>(r.cardiacOncall||[]).includes(n)&&r.ocCardiac==='yes').length})).filter(d=>d.oncall>0);
-    const months=[...Array(12)].map((_,i)=>{ const m=(i+3)%12+1; const y=m>=4?annualYear:annualYear+1; return String(y)+'-'+String(m).padStart(2,'0'); });
+    const months=[4,5,6,7,8,9,10,11,12,1,2,3].map(m=>{ const y=m>=4?annualYear:annualYear+1; return String(y)+'-'+String(m).padStart(2,'0'); });
     const monthLabels=months.map(m=>m.slice(5)+'月');
     const monthGrands=months.map(m=>yearRecs.filter(r=>r.date.startsWith(m)).reduce((s,r)=>s+Object.values(r.tasks||{}).reduce((a,v)=>a+v,0)+(r.freeTasks||[]).reduce((a,ft)=>a+(ft.count||1),0),0));
     const monthAssist=months.map(m=>{const tt={};yearRecs.filter(r=>r.date.startsWith(m)).forEach(r=>Object.entries(r.tasks||{}).forEach(([n,v])=>tt[n]=(tt[n]||0)+v));return Object.entries(tt).filter(([n])=>assistKw.some(k=>n.includes(k))).reduce((s,[,v])=>s+v,0);});
