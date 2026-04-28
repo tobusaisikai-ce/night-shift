@@ -360,6 +360,91 @@ textarea { height: 76px; resize: vertical; font-size: 13px; line-height: 1.6; }
 .ys-sub { font-size: 10px; color: var(--text-dim); margin-top: 3px; }
 
 /* ===== 上申資料 ===== */
+.report-page {
+  background: #fff;
+  padding: 20px;
+  margin-bottom: 16px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+.report-page-header {
+  border-bottom: 2px solid #1a2230;
+  padding-bottom: 8px;
+  margin-bottom: 14px;
+}
+.report-page-title {
+  font-size: 14px;
+  font-weight: 800;
+  color: #1a2230;
+}
+.report-page-sub {
+  font-size: 10px;
+  color: var(--text-muted);
+  margin-top: 3px;
+}
+.report-text-editable {
+  font-size: 10.5px;
+  line-height: 1.9;
+  color: #1e293b;
+  font-family: 'JetBrains Mono', monospace;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px 14px;
+  margin-bottom: 14px;
+  min-height: 120px;
+  outline: none;
+}
+.report-text-editable:focus {
+  border-color: var(--accent);
+}
+.report-charts-row {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.report-chart-box {
+  flex: 1;
+  min-width: 200px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+.report-chart-title {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 8px;
+}
+.report-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+  margin-bottom: 20px;
+}
+
+/* ===== 印刷スタイル ===== */
+@media print {
+  .no-print, nav, .tab-bar, .top-actions, .page:not(#page-stats) { display: none !important; }
+  #page-stats { display: block !important; }
+  #stats-content, #report-content { display: block !important; }
+  .stats-tabs { display: none !important; }
+  body { background: #fff; margin: 0; padding: 0; }
+  .report-page {
+    border: none;
+    border-radius: 0;
+    margin: 0;
+    padding: 15mm 15mm 10mm;
+    box-shadow: none;
+  }
+  .report-page-header { border-bottom: 1.5pt solid #1a2230; }
+  canvas { max-width: 100%; }
+  .report-chart-box { background: #fff; border: 0.5pt solid #e2e8f0; }
+  @page { size: A4 portrait; margin: 0; }
+}
 .report-section { background: #fff; border: 1.5px solid var(--border); border-radius: var(--radius); padding: 16px; margin-bottom: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.04); }
 .report-section h3 { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 14px; font-weight: 800; }
 .report-preview { background: var(--surface2); border: 1.5px solid var(--border); border-radius: 9px; padding: 14px; margin-bottom: 12px; font-size: 12px; line-height: 1.9; color: var(--text-muted); white-space: pre-wrap; max-height: 320px; overflow-y: auto; font-family: 'Noto Sans JP', sans-serif; }
@@ -2574,27 +2659,249 @@ CE夜勤業務集計システム
 ━━━━━━━━━━━━━━━━━━━━━━━`;
 
   c.innerHTML = `
-    <div class="report-section">
-      <h3>📄 上申・報告書用テキスト自動生成</h3>
-      <div class="report-preview" id="report-text-preview">${reportText.replace(/</g,'&lt;').replace(/\n/g,'<br>')}</div>
+    <!-- PDF印刷用ラッパー -->
+    <div id="report-print-area">
+
+      <!-- ===== 1枚目 ===== -->
+      <div class="report-page">
+        <div class="report-page-header">
+          <div class="report-page-title">夜勤業務実績報告　${fmtYMDisp(sMonth)}</div>
+          <div class="report-page-sub">関東労災病院　臨床工学科　CE夜勤業務集計システム</div>
+        </div>
+
+        <!-- テキストエリア（編集可能） -->
+        <div class="report-text-editable" id="report-text-area" contenteditable="true">${reportText.replace(/\n/g,'<br>').replace(/ /g,'&nbsp;')}</div>
+
+        <div class="report-charts-row">
+          <!-- 月別業務件数推移 -->
+          <div class="report-chart-box">
+            <div class="report-chart-title">月別業務件数推移</div>
+            <canvas id="chart-monthly" width="340" height="200"></canvas>
+          </div>
+          <!-- 時間帯別円グラフ -->
+          <div class="report-chart-box">
+            <div class="report-chart-title">時間帯別業務分布</div>
+            <canvas id="chart-slot" width="200" height="200"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===== 2枚目 ===== -->
+      <div class="report-page" style="page-break-before:always">
+        <div class="report-page-header">
+          <div class="report-page-title">夜勤業務実績報告　${fmtYMDisp(sMonth)}　（詳細）</div>
+          <div class="report-page-sub">関東労災病院　臨床工学科　CE夜勤業務集計システム</div>
+        </div>
+
+        <div class="report-charts-row">
+          <!-- 補助循環・緊急カテ推移 -->
+          <div class="report-chart-box" style="flex:1.5">
+            <div class="report-chart-title">補助循環導入 / 緊急カテーテル対応　月別推移</div>
+            <canvas id="chart-emerg" width="380" height="200"></canvas>
+          </div>
+        </div>
+
+        <!-- 業務件数ランキング横棒 -->
+        <div class="report-chart-box" style="margin-top:12px">
+          <div class="report-chart-title">業務件数 ランキング TOP10</div>
+          <canvas id="chart-rank" width="560" height="240"></canvas>
+        </div>
+
+        <!-- 追記メモ -->
+        <div style="margin-top:12px">
+          <div class="report-chart-title">所見・追記</div>
+          <div contenteditable="true" id="report-extra-editable" style="min-height:80px;border:1px solid #e2e8f0;border-radius:8px;padding:10px;font-size:11px;line-height:1.8;color:#1e293b;background:#f8fafc" placeholder="追記内容をここに入力..."></div>
+        </div>
+      </div>
+
+    </div><!-- /#report-print-area -->
+
+    <!-- ボタン群（印刷時は非表示） -->
+    <div class="report-actions no-print">
       <button class="copy-report-btn" onclick="copyReport()">📋 テキストをコピー</button>
-    </div>
-    <div class="report-section">
-      <h3>✏️ 追記・修正メモ</h3>
-      <textarea id="report-extra" placeholder="上申に追記したい内容、所見、改善策など..."></textarea>
+      <button class="copy-report-btn" style="background:var(--green)" onclick="printReport()">🖨️ PDF出力（印刷）</button>
     </div>`;
 
-  // テキストをグローバルに保持
+  // グラフ描画
   window._reportText = reportText;
+  setTimeout(()=>{
+    drawMonthlyChart(allRecs);
+    drawSlotChart(slots);
+    drawEmergChart(allRecs);
+    drawRankChart(taskTot);
+  }, 100);
+}
+
+// ===== グラフ描画関数 =====
+
+function drawMonthlyChart(allRecs) {
+  const canvas = document.getElementById('chart-monthly');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const months = [...new Set(allRecs.map(r=>r.date.slice(0,7)))].sort().slice(-12);
+  const values = months.map(m=>{
+    const mr = allRecs.filter(r=>r.date.startsWith(m));
+    return mr.reduce((s,r)=>s+Object.values(r.tasks||{}).reduce((a,v)=>a+v,0)+(r.freeTasks||[]).reduce((a,ft)=>a+(ft.count||1),0),0);
+  });
+  drawLineChart(ctx, canvas.width, canvas.height, months.map(m=>m.slice(5)+'月'), values, '件', '#3b82f6', '業務件数');
+}
+
+function drawSlotChart(slots) {
+  const canvas = document.getElementById('chart-slot');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const total = slots.early + slots.mid + slots.late;
+  if (!total) { ctx.fillStyle='#94a3b8'; ctx.font='12px sans-serif'; ctx.fillText('データなし',60,100); return; }
+  const data = [
+    { label:'準夜', value:slots.early, color:'#3b82f6' },
+    { label:'深夜', value:slots.mid,   color:'#7c3aed' },
+    { label:'早朝', value:slots.late,  color:'#06b6d4' },
+  ];
+  drawPieChart(ctx, canvas.width, canvas.height, data, total);
+}
+
+function drawEmergChart(allRecs) {
+  const canvas = document.getElementById('chart-emerg');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const assistKw = ['V-A ECMO開始','V-V ECMO開始','IABP開始','Impella CP導入','Impella 5.5導入'];
+  const emergKw  = ['緊急カテーテル','心筋生検','心嚢穿刺'];
+  const months = [...new Set(allRecs.map(r=>r.date.slice(0,7)))].sort().slice(-12);
+  const assistVals = months.map(m=>{ const tt={}; allRecs.filter(r=>r.date.startsWith(m)).forEach(r=>Object.entries(r.tasks||{}).forEach(([n,v])=>tt[n]=(tt[n]||0)+v)); return Object.entries(tt).filter(([n])=>assistKw.some(k=>n.includes(k))).reduce((s,[,v])=>s+v,0); });
+  const emergVals  = months.map(m=>{ const tt={}; allRecs.filter(r=>r.date.startsWith(m)).forEach(r=>Object.entries(r.tasks||{}).forEach(([n,v])=>tt[n]=(tt[n]||0)+v)); return Object.entries(tt).filter(([n])=>emergKw.some(k=>n.includes(k))).reduce((s,[,v])=>s+v,0); });
+  drawMultiLineChart(ctx, canvas.width, canvas.height, months.map(m=>m.slice(5)+'月'),
+    [{label:'補助循環導入',values:assistVals,color:'#dc2626'},{label:'緊急カテ対応',values:emergVals,color:'#ea580c'}], '件');
+}
+
+function drawRankChart(taskTot) {
+  const canvas = document.getElementById('chart-rank');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const top10 = Object.entries(taskTot).sort((a,b)=>b[1]-a[1]).slice(0,10);
+  drawHBarChart(ctx, canvas.width, canvas.height, top10);
+}
+
+// ===== 折れ線グラフ（単系列） =====
+function drawLineChart(ctx, w, h, labels, values, yUnit, color, seriesLabel) {
+  const pad = {top:20,right:20,bottom:40,left:45};
+  const cw = w-pad.left-pad.right, ch = h-pad.top-pad.bottom;
+  const max = Math.max(...values, 1);
+  ctx.clearRect(0,0,w,h);
+  ctx.strokeStyle='#e2e8f0'; ctx.lineWidth=1;
+  // グリッド・Y軸ラベル
+  for (let i=0;i<=4;i++) {
+    const y = pad.top + ch*(1-i/4);
+    ctx.beginPath(); ctx.moveTo(pad.left,y); ctx.lineTo(pad.left+cw,y); ctx.stroke();
+    ctx.fillStyle='#64748b'; ctx.font='9px sans-serif'; ctx.textAlign='right';
+    ctx.fillText(Math.round(max*i/4)+yUnit, pad.left-4, y+3);
+  }
+  // Y軸タイトル
+  ctx.save(); ctx.translate(12,pad.top+ch/2); ctx.rotate(-Math.PI/2);
+  ctx.fillStyle='#64748b'; ctx.font='9px sans-serif'; ctx.textAlign='center';
+  ctx.fillText(yUnit, 0, 0); ctx.restore();
+  // X軸ラベル
+  ctx.fillStyle='#64748b'; ctx.font='9px sans-serif'; ctx.textAlign='center';
+  labels.forEach((l,i)=>{ const x=pad.left+cw*i/(labels.length-1||1); ctx.fillText(l,x,h-pad.bottom+14); });
+  // 折れ線
+  ctx.beginPath(); ctx.strokeStyle=color; ctx.lineWidth=2;
+  values.forEach((v,i)=>{ const x=pad.left+cw*i/(values.length-1||1), y=pad.top+ch*(1-v/max); i===0?ctx.moveTo(x,y):ctx.lineTo(x,y); });
+  ctx.stroke();
+  // 塗りつぶし
+  ctx.beginPath(); ctx.fillStyle=color+'22';
+  values.forEach((v,i)=>{ const x=pad.left+cw*i/(values.length-1||1), y=pad.top+ch*(1-v/max); i===0?ctx.moveTo(x,y):ctx.lineTo(x,y); });
+  ctx.lineTo(pad.left+cw,pad.top+ch); ctx.lineTo(pad.left,pad.top+ch); ctx.closePath(); ctx.fill();
+  // ドット・値
+  values.forEach((v,i)=>{ const x=pad.left+cw*i/(values.length-1||1), y=pad.top+ch*(1-v/max); ctx.beginPath(); ctx.arc(x,y,3,0,Math.PI*2); ctx.fillStyle=color; ctx.fill(); if(v>0){ctx.fillStyle='#1e293b';ctx.font='8px sans-serif';ctx.textAlign='center';ctx.fillText(v,x,y-6);} });
+}
+
+// ===== 折れ線グラフ（複数系列） =====
+function drawMultiLineChart(ctx, w, h, labels, series, yUnit) {
+  const pad = {top:30,right:20,bottom:40,left:45};
+  const cw = w-pad.left-pad.right, ch = h-pad.top-pad.bottom;
+  const max = Math.max(...series.flatMap(s=>s.values), 1);
+  ctx.clearRect(0,0,w,h);
+  ctx.strokeStyle='#e2e8f0'; ctx.lineWidth=1;
+  for (let i=0;i<=4;i++) {
+    const y = pad.top+ch*(1-i/4);
+    ctx.beginPath(); ctx.moveTo(pad.left,y); ctx.lineTo(pad.left+cw,y); ctx.stroke();
+    ctx.fillStyle='#64748b'; ctx.font='9px sans-serif'; ctx.textAlign='right';
+    ctx.fillText(Math.round(max*i/4)+yUnit, pad.left-4, y+3);
+  }
+  ctx.fillStyle='#64748b'; ctx.font='9px sans-serif'; ctx.textAlign='center';
+  labels.forEach((l,i)=>{ const x=pad.left+cw*i/(labels.length-1||1); ctx.fillText(l,x,h-pad.bottom+14); });
+  // 凡例
+  series.forEach((s,si)=>{ ctx.fillStyle=s.color; ctx.fillRect(pad.left+si*100,6,12,8); ctx.fillStyle='#1e293b'; ctx.font='9px sans-serif'; ctx.textAlign='left'; ctx.fillText(s.label,pad.left+si*100+16,14); });
+  series.forEach(s=>{
+    ctx.beginPath(); ctx.strokeStyle=s.color; ctx.lineWidth=2;
+    s.values.forEach((v,i)=>{ const x=pad.left+cw*i/(s.values.length-1||1), y=pad.top+ch*(1-v/max); i===0?ctx.moveTo(x,y):ctx.lineTo(x,y); });
+    ctx.stroke();
+    s.values.forEach((v,i)=>{ const x=pad.left+cw*i/(s.values.length-1||1), y=pad.top+ch*(1-v/max); ctx.beginPath(); ctx.arc(x,y,3,0,Math.PI*2); ctx.fillStyle=s.color; ctx.fill(); if(v>0){ctx.fillStyle='#1e293b';ctx.font='8px sans-serif';ctx.textAlign='center';ctx.fillText(v,x,y-6);} });
+  });
+}
+
+// ===== 円グラフ =====
+function drawPieChart(ctx, w, h, data, total) {
+  const cx=w*0.42, cy=h/2, r=Math.min(w,h)*0.38;
+  ctx.clearRect(0,0,w,h);
+  let angle=-Math.PI/2;
+  data.forEach(d=>{
+    const slice=d.value/total*Math.PI*2;
+    ctx.beginPath(); ctx.moveTo(cx,cy); ctx.arc(cx,cy,r,angle,angle+slice); ctx.closePath();
+    ctx.fillStyle=d.color; ctx.fill();
+    ctx.strokeStyle='#fff'; ctx.lineWidth=2; ctx.stroke();
+    // %ラベル
+    const mid=angle+slice/2, lx=cx+Math.cos(mid)*r*0.65, ly=cy+Math.sin(mid)*r*0.65;
+    const pct=Math.round(d.value/total*100);
+    if(pct>5){ ctx.fillStyle='#fff'; ctx.font='bold 11px sans-serif'; ctx.textAlign='center'; ctx.fillText(pct+'%',lx,ly+4); }
+    angle+=slice;
+  });
+  // 凡例
+  const lx=w*0.78;
+  data.forEach((d,i)=>{
+    const ly=cy-20+i*22;
+    ctx.fillStyle=d.color; ctx.fillRect(lx,ly,10,10);
+    ctx.fillStyle='#1e293b'; ctx.font='10px sans-serif'; ctx.textAlign='left';
+    ctx.fillText(`${d.label} ${d.value}件`,lx+14,ly+9);
+  });
+}
+
+// ===== 横棒グラフ =====
+function drawHBarChart(ctx, w, h, data) {
+  const pad={top:10,right:60,bottom:20,left:190};
+  const cw=w-pad.left-pad.right, ch=h-pad.top-pad.bottom;
+  const barH=Math.min(18, ch/data.length-4);
+  const max=data.length?data[0][1]:1;
+  ctx.clearRect(0,0,w,h);
+  const colors=['#f59e0b','#94a3b8','#cd7c4a','#3b82f6','#3b82f6','#3b82f6','#3b82f6','#3b82f6','#3b82f6','#3b82f6'];
+  data.forEach(([name,val],i)=>{
+    const y=pad.top+i*(ch/data.length);
+    // ラベル
+    ctx.fillStyle='#1e293b'; ctx.font='9px sans-serif'; ctx.textAlign='right';
+    const shortName = name.length>20 ? name.slice(0,19)+'…' : name;
+    ctx.fillText(shortName, pad.left-6, y+barH/2+3);
+    // バー
+    const bw=cw*(val/max);
+    ctx.fillStyle=colors[i]||'#3b82f6';
+    ctx.beginPath();
+    ctx.roundRect ? ctx.roundRect(pad.left,y,bw,barH,3) : ctx.rect(pad.left,y,bw,barH);
+    ctx.fill();
+    // 値
+    ctx.fillStyle='#1e293b'; ctx.font='9px sans-serif'; ctx.textAlign='left';
+    ctx.fillText(val+'件', pad.left+bw+4, y+barH/2+3);
+  });
+}
+
+function printReport() {
+  window.print();
 }
 
 function copyReport() {
-  const extra = document.getElementById('report-extra')?.value?.trim();
-  const full = extra ? window._reportText + '\n\n■ 追記\n' + extra : window._reportText;
+  const mainText = document.getElementById('report-text-area')?.innerText || window._reportText || '';
+  const extra = document.getElementById('report-extra-editable')?.innerText?.trim();
+  const full = extra ? mainText + '\n\n■ 追記\n' + extra : mainText;
   navigator.clipboard.writeText(full).then(()=>{
     showToast('📋 クリップボードにコピーしました');
   }).catch(()=>{
-    // fallback
     const ta = document.createElement('textarea');
     ta.value = full;
     document.body.appendChild(ta);
