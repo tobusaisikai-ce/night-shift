@@ -3361,10 +3361,10 @@ async function printAnnualReport() {
 
     const barRow = (label, val, maxVal, fy, barColor='#3b82f6', rowH=5.5) => {
       const short = label.length>25?label.slice(0,24)+'…':label;
-      jpText(short,M,fy,7.5,'#1e293b');
+      jpText(short,M,fy,8.5,'#1e293b');
       const bw=maxVal>0&&isFinite(val)?Math.min(CW-50,Math.max(1,(CW-50)*val/maxVal)):1;
       setFill(barColor); pdf.rect(M+50,fy+0.5,bw,rowH-1.5,'F');
-      jpText(val+'件',M+CW,fy,7.5,'#64748b','right');
+      jpText(val+'件',M+CW,fy,8.5,'#64748b','right');
       hLine(fy+rowH,'#e2e8f0',0.2); return fy+rowH;
     };
 
@@ -3426,7 +3426,7 @@ async function printAnnualReport() {
     // KPI
     const kpiItems=[{label:'年間夜勤回数',value:String(nights),unit:'回',color:'#3b82f6'},{label:'年間総業務件数',value:String(grand),unit:'件',color:'#16a34a'},{label:'1夜勤平均',value:String(avg),unit:'件/夜勤',color:'#ea580c'},{label:'補助循環導入',value:String(assistCnt),unit:'件',color:'#dc2626'},{label:'緊急カテ対応',value:String(emergCnt),unit:'件',color:'#06b6d4'}];
     const cw=CW/kpiItems.length;
-    kpiItems.forEach((item,i)=>{const x=M+cw*i;setFill('#f1f5f9');setDraw('#e2e8f0');pdf.setLineWidth(0.2);if(cw>0)pdf.rect(x,y,cw,14,'FD');jpText(item.label,x+cw/2,y+2,6,'#64748b','center');jpText(item.value,x+cw/2,y+6,12,item.color,'center');jpText(item.unit,x+cw/2,y+11,6,'#64748b','center');});
+    kpiItems.forEach((item,i)=>{const x=M+cw*i;setFill('#f1f5f9');setDraw('#e2e8f0');pdf.setLineWidth(0.2);if(cw>0)pdf.rect(x,y,cw,14,'FD');jpText(item.label,x+cw/2,y+2,7,'#64748b','center');jpText(item.value,x+cw/2,y+6,12,item.color,'center');jpText(item.unit,x+cw/2,y+11,7,'#64748b','center');});
     y+=17;
 
     // 年間業務集中日・スタッフ別 2カラムTOP5
@@ -3454,7 +3454,7 @@ async function printAnnualReport() {
       const rc=annRankColors[i];
       jpText(i<3?annRankMedals[i]:(i+1)+'.',annCol2X+1,y,i<3?9:7,rc);
       jpText(d.name.length>7?d.name.slice(0,6)+'…':d.name,annCol2X+9,y,7.5,'#1e293b');
-      jpText(`${d.nights}夜勤 avg${d.avg}件`,annCol2X+9,y+4,6,'#64748b');
+      jpText(`${d.nights}夜勤 avg${d.avg}件`,annCol2X+9,y+4,7,'#64748b');
       jpText(`${d.total}件`,annCol2X+annColW,y+1,8,'#3b82f6','right');
       hLine(y+annRankRowH*1.6,'#e2e8f0',0.15); y+=annRankRowH*1.7;
     });
@@ -3468,8 +3468,8 @@ async function printAnnualReport() {
     if(slotSum>0){
       [['準夜（16:30〜22:00）',slots.early,'#3b82f6'],['深夜（22:00〜翌3:30）',slots.mid,'#7c3aed'],['早朝（翌3:30〜9:00）',slots.late,'#06b6d4']].forEach(([l,v,c])=>{
         const pct=Math.round(v/slotSum*100),bw=Math.max(1,(CW-60)*pct/100);
-        jpText(l,M,y,8,'#1e293b'); setFill(c); if(bw>0&&isFinite(bw)) pdf.rect(M+60,y+0.5,bw,4,'F');
-        jpText(`${v}件(${pct}%)`,M+CW,y,8,'#64748b','right'); hLine(y+5.5,'#e2e8f0',0.2); y+=6;
+        jpText(l,M,y,9,'#1e293b'); setFill(c); if(bw>0&&isFinite(bw)) pdf.rect(M+60,y+0.5,bw,4,'F');
+        jpText(`${v}件(${pct}%)`,M+CW,y,9,'#64748b','right'); hLine(y+5.5,'#e2e8f0',0.2); y+=6;
       });
     } nl(1);
 
@@ -3481,13 +3481,13 @@ async function printAnnualReport() {
     }); nl(1);
 
     y=sectionHeader('■ オンコール状況（年間）',y); nl(2);
-    jpText(`OC担当呼び出し：${ocCall}回（呼び出し率 ${nights?Math.round(ocCall/nights*100):0}%）`,M+2,y,8,'#1e293b'); y+=5;
+    jpText(`OC担当呼び出し：${ocCall}回（呼び出し率 ${nights?Math.round(ocCall/nights*100):0}%）`,M+2,y,9,'#1e293b'); y+=5;
     jpText(`OC外呼び出し：${ocExt}回${Object.keys(extCallerMap).length?'　'+Object.entries(extCallerMap).map(([n,v])=>`${n}:${v}回`).join('・'):''}`,M+2,y,8,'#1e293b'); y+=5;
-    jpText(`心外OC呼び出し：${ocCardiacCnt}回`,M+2,y,8,'#1e293b'); y+=5; nl(1);
+    jpText(`心外OC呼び出し：${ocCardiacCnt}回`,M+2,y,9,'#1e293b'); y+=5; nl(1);
 
     if(cardiacReport.length){
       y=sectionHeader('■ 心外オンコール 担当者別集計（年間）',y); nl(2);
-      cardiacReport.forEach(d=>{const rate=d.oncall?Math.round(d.called/d.oncall*100):0;jpText(`${d.name}：担当${d.oncall}回 / 呼び出し${d.called}回（${rate}%）`,M+2,y,8,'#1e293b');y+=5;}); nl(1);
+      cardiacReport.forEach(d=>{const rate=d.oncall?Math.round(d.called/d.oncall*100):0;jpText(`${d.name}：担当${d.oncall}回 / 呼び出し${d.called}回（${rate}%）`,M+2,y,9,'#1e293b');y+=5;}); nl(1);
     }
 
     y=sectionHeader('■ 所見・課題',y,'#dc2626'); nl(2);
@@ -3497,9 +3497,9 @@ async function printAnnualReport() {
       ocExt>0?`・年間${ocExt}回のOC外呼び出しが発生。即応体制の整備が必要。`:null,
       slots.mid>slots.early&&slots.mid>slots.late?'・深夜帯への業務集中が顕著。仮眠確保・応援体制の整備が望まれる。':null,
     ].filter(Boolean);
-    if(!issues.length){jpText('・特記事項なし',M+2,y,8,'#64748b');y+=5;}
-    else{issues.forEach(t=>{jpText(t,M+2,y,8,'#1e293b');y+=5;});}
-    jpText(`作成日：${new Date().toLocaleDateString('ja-JP')}`,M+CW,H-M,7,'#64748b','right');
+    if(!issues.length){jpText('・特記事項なし',M+2,y,9,'#64748b');y+=5;}
+    else{issues.forEach(t=>{jpText(t,M+2,y,9,'#1e293b');y+=5;});}
+    jpText(`作成日：${new Date().toLocaleDateString('ja-JP')}`,M+CW,H-M,8,'#64748b','right');
 
     // ===== 2ページ =====
     pdf.addPage(); y=M;
@@ -3523,7 +3523,7 @@ async function printAnnualReport() {
     y=sectionHeader('■ 業務件数 ランキング TOP10（年間）',y); nl(2);
     const maxR=top10.length?top10[0][1]:1;
     top10.forEach(([name,val])=>{y=barRow(name,val,maxR,y,'#3b82f6',5);});
-    jpText(`作成日：${new Date().toLocaleDateString('ja-JP')}`,M+CW,H-M,7,'#64748b','right');
+    jpText(`作成日：${new Date().toLocaleDateString('ja-JP')}`,M+CW,H-M,8,'#64748b','right');
 
     // ===== 3ページ =====
     pdf.addPage(); y=M;
@@ -3539,7 +3539,7 @@ async function printAnnualReport() {
       const maxOC=Math.max(...cardiacReport.map(d=>d.oncall),1);
       cardiacReport.forEach(d=>{
         const rate=d.oncall?Math.round(d.called/d.oncall*100):0;
-        jpText(d.name,M,y,8,'#1e293b');
+        jpText(d.name,M,y,9,'#1e293b');
         const bwO=Math.max(1,(CW-60)*d.oncall/maxOC);
         setFill('#06b6d4'); if(bwO>0&&isFinite(bwO)) pdf.rect(M+30,y+0.5,bwO,3,'F');
         const bwC=d.called&&maxOC>0?Math.min(CW-60,Math.max(1,(CW-60)*d.called/maxOC)):0;
@@ -3550,7 +3550,7 @@ async function printAnnualReport() {
       });
     }
 
-    jpText(`作成日：${new Date().toLocaleDateString('ja-JP')}`,M+CW,H-M,7,'#64748b','right');
+    jpText(`作成日：${new Date().toLocaleDateString('ja-JP')}`,M+CW,H-M,8,'#64748b','right');
 
     // ===== 4ページ：スタッフランキング① =====
     pdf.addPage(); y=M;
@@ -3602,7 +3602,7 @@ async function printAnnualReport() {
       rawRows.forEach((r,i)=>{
         if(y > H-M-10){ pdf.addPage(); y=M+15; }
         jpText(i<3?['🥇','🥈','🥉'][i]:(i+1)+'.',M+2,y,i<3?9:8,i<3?['#f59e0b','#94a3b8','#cd7c4a'][i]:'#64748b');
-        jpText(r.name,M+12,y,8,'#1e293b');
+        jpText(r.name,M+12,y,9,'#1e293b');
         const bwRaw = (CW-80) * r.val / maxVal2;
         const bw = Math.min(CW-80, Math.max(2, isFinite(bwRaw)?bwRaw:2));
         setFill(color); pdf.rect(M+55, y+0.5, bw, 3.5, 'F');
@@ -3633,7 +3633,7 @@ async function printAnnualReport() {
       jpText(`${r.date.slice(5).replace('-','/')}（${r.dow}）${r.staff}`,M+12,y,8,'#1e293b');
       const bw2=maxPeak>0 ? Math.min(CW-90, Math.max(2,(CW-90)*r.total/maxPeak)) : 2;
       setFill('#1a2230'); pdf.rect(M+75,y+0.5,bw2,3.5,'F');
-      jpText(`${r.total}件`,M+CW,y,8,'#1e293b','right');
+      jpText(`${r.total}件`,M+CW,y,9,'#1e293b','right');
       hLine(y+5,'#e2e8f0',0.15); y+=5.5;
     }); nl(3);
 
@@ -3642,7 +3642,7 @@ async function printAnnualReport() {
     pdfRankSection('■ 【番外編】OC外呼び出し TOP10','#dc2626',sd=>sd.ocExt,'回');
     pdfRankSection('■ 【番外編】心外OC呼び出し TOP10','#7c3aed',sd=>sd.ocCardiac,'回');
 
-    jpText(`作成日：${new Date().toLocaleDateString('ja-JP')}`,M+CW,H-M,7,'#64748b','right');
+    jpText(`作成日：${new Date().toLocaleDateString('ja-JP')}`,M+CW,H-M,8,'#64748b','right');
 
     pdf.save(`CE夜勤業務実績報告_${annualYear}年度.pdf`);
   } catch(e) {
