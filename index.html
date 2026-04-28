@@ -6,6 +6,8 @@
 <title>CE 夜勤業務集計</title>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <style>
 :root {
   --bg: #f0f4f8;
@@ -2906,7 +2908,7 @@ CE夜勤業務集計システム
     </div>
     <div class="report-actions no-print">
       <button class="copy-report-btn" onclick="copyAnnualReport()">📋 テキストをコピー</button>
-      <button class="copy-report-btn" style="background:var(--green)" onclick="window.print()">🖨️ PDF出力（印刷）</button>
+      <button class="copy-report-btn" style="background:var(--green)" onclick="printAnnualReport()">🖨️ PDF出力（印刷）</button>
     </div>`;
 
   window._annualReportText = reportText;
@@ -2918,6 +2920,216 @@ CE夜勤業務集計システム
     const c5=document.getElementById('ar-chart-oc'); if(c5){const{ctx,w,h}=initCanvas(c5);drawLineChart(ctx,w,h,monthLabels,monthOCRate,'%','#ea580c','呼び出し率');}
     const c6=document.getElementById('ar-chart-cardiac'); if(c6&&cardiacEntries.length){const{ctx,w,h}=initCanvas(c6);drawGroupedHBarChart(ctx,w,h,cardiacEntries);}
   },100);
+}
+
+async function printAnnualReport() {
+  const btn = document.querySelector('[onclick="window.print()"]');
+  if (btn) { btn.textContent = '⏳ PDF生成中...'; btn.disabled = true; }
+  try {
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+    const W=210, H=297, M=15, CW=180;
+    let y = M;
+
+    const setFill = (hex) => { const r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16); pdf.setFillColor(r,g,b); };
+    const setDraw = (hex) => { const r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16); pdf.setDrawColor(r,g,b); };
+    const hLine = (fy,color='#e2e8f0',lw=0.3) => { setDraw(color); pdf.setLineWidth(lw); pdf.line(M,fy,M+CW,fy); };
+    const nl = (h=5) => { y += h; };
+
+    const jpText = (text, x, fy, size=9, color='#1e293b', align='left') => {
+      const canvas = document.createElement('canvas');
+      const scale = 3, fontSize = size * scale;
+      canvas.height = Math.ceil(fontSize * 1.6);
+      const ctx = canvas.getContext('2d');
+      ctx.font = `${fontSize}px "Noto Sans JP", sans-serif`;
+      const tw = ctx.measureText(text).width;
+      canvas.width = Math.ceil(tw) + 8;
+      ctx.clearRect(0,0,canvas.width,canvas.height);
+      ctx.font = `${fontSize}px "Noto Sans JP", sans-serif`;
+      const r=parseInt(color.slice(1,3),16),g=parseInt(color.slice(3,5),16),b=parseInt(color.slice(5,7),16);
+      ctx.fillStyle=`rgb(${r},${g},${b})`; ctx.textBaseline='top';
+      let dx=2;
+      if(align==='right'){ctx.textAlign='right';dx=canvas.width-2;}
+      else if(align==='center'){ctx.textAlign='center';dx=canvas.width/2;}
+      ctx.fillText(text,dx,2);
+      const imgData=canvas.toDataURL('image/png');
+      const pW=canvas.width/scale/3.78, pH=canvas.height/scale/3.78;
+      let px=x;
+      if(align==='right') px=x-pW;
+      else if(align==='center') px=x-pW/2;
+      pdf.addImage(imgData,'PNG',px,fy-pH*0.1,pW,pH);
+    };
+
+    const sectionHeader = (title, fy, bg='#1a2230') => {
+      setFill(bg); pdf.setLineWidth(0); pdf.rect(M,fy,CW,7,'F');
+      jpText(title,M+3,fy+1.5,9,'#ffffff'); return fy+8;
+    };
+
+    const barRow = (label, val, maxVal, fy, barColor='#3b82f6', rowH=5.5) => {
+      const short = label.length>25?label.slice(0,24)+'…':label;
+      jpText(short,M,fy,7.5,'#1e293b');
+      const bw=Math.max(1,(CW-50)*val/maxVal);
+      setFill(barColor); pdf.rect(M+50,fy+0.5,bw,rowH-1.5,'F');
+      jpText(val+'件',M+CW,fy,7.5,'#64748b','right');
+      hLine(fy+rowH,'#e2e8f0',0.2); return fy+rowH;
+    };
+
+    const embedChart = async (drawFn, x, fy, cw, ch) => {
+      const canvas = document.createElement('canvas');
+      canvas.width=Math.round(cw*3.78*2); canvas.height=Math.round(ch*3.78*2);
+      const ctx=canvas.getContext('2d'); ctx.scale(2,2);
+      drawFn(ctx,cw*3.78,ch*3.78);
+      pdf.addImage(canvas.toDataURL('image/png'),'PNG',x,fy,cw,ch);
+      return fy+ch;
+    };
+
+    const allRecs = getRecords();
+    const yearRecs = allRecs.filter(r=>r.date&&r.date.startsWith(String(annualYear)));
+    const nights=yearRecs.length;
+    const taskTot={};
+    yearRecs.forEach(r=>{ Object.entries(r.tasks||{}).forEach(([n,v])=>taskTot[n]=(taskTot[n]||0)+v); (r.freeTasks||[]).forEach(ft=>{if(ft.name)taskTot[ft.name]=(taskTot[ft.name]||0)+(ft.count||1);}); });
+    const grand=Object.values(taskTot).reduce((s,v)=>s+v,0);
+    const avg=nights?(grand/nights).toFixed(1):0;
+    const assistKw=['V-A ECMO開始','V-V ECMO開始','IABP開始','Impella CP導入','Impella 5.5導入'];
+    const emergKw=['緊急カテーテル','心筋生検','心嚢穿刺'];
+    const assistCnt=Object.entries(taskTot).filter(([n])=>assistKw.some(k=>n.includes(k))).reduce((s,[,v])=>s+v,0);
+    const emergCnt=Object.entries(taskTot).filter(([n])=>emergKw.some(k=>n.includes(k))).reduce((s,[,v])=>s+v,0);
+    const pacingCnt=taskTot['体外式ペースメーカー挿入']||0;
+    const ocCall=yearRecs.filter(r=>r.ocCall==='yes').length;
+    const ocExt=yearRecs.filter(r=>r.ocExt==='yes').length;
+    const ocCardiacCnt=yearRecs.filter(r=>r.ocCardiac==='yes').length;
+    const slots={early:0,mid:0,late:0};
+    yearRecs.forEach(r=>{if(r.taskSlots)Object.values(r.taskSlots).forEach(s=>{slots.early+=s.early||0;slots.mid+=s.mid||0;slots.late+=s.late||0;});});
+    const slotSum=slots.early+slots.mid+slots.late;
+    const top5=Object.entries(taskTot).sort((a,b)=>b[1]-a[1]).slice(0,5);
+    const top10=Object.entries(taskTot).sort((a,b)=>b[1]-a[1]).slice(0,10);
+    const peakDays=yearRecs.map(r=>({date:r.date,dow:['日','月','火','水','木','金','土'][new Date(r.date+'T00:00:00').getDay()],staff:(r.staff||[]).join('・'),total:Object.values(r.tasks||{}).reduce((s,v)=>s+v,0)+(r.freeTasks||[]).reduce((s,ft)=>s+(ft.count||1),0)})).sort((a,b)=>b.total-a.total).slice(0,3);
+    const extCallerMap={};
+    yearRecs.forEach(r=>{if(r.ocExt==='yes')(r.extCallers||[]).forEach(s=>{extCallerMap[s]=(extCallerMap[s]||0)+1;});});
+    const cardiacReport=CARDIAC_ONCALL_STAFF.map(n=>({name:n,oncall:yearRecs.filter(r=>(r.cardiacOncall||[]).includes(n)).length,called:yearRecs.filter(r=>(r.cardiacOncall||[]).includes(n)&&r.ocCardiac==='yes').length})).filter(d=>d.oncall>0);
+    const months=[...Array(12)].map((_,i)=>String(annualYear)+'-'+String(i+1).padStart(2,'0'));
+    const monthLabels=months.map(m=>m.slice(5)+'月');
+    const monthGrands=months.map(m=>yearRecs.filter(r=>r.date.startsWith(m)).reduce((s,r)=>s+Object.values(r.tasks||{}).reduce((a,v)=>a+v,0)+(r.freeTasks||[]).reduce((a,ft)=>a+(ft.count||1),0),0));
+    const monthAssist=months.map(m=>{const tt={};yearRecs.filter(r=>r.date.startsWith(m)).forEach(r=>Object.entries(r.tasks||{}).forEach(([n,v])=>tt[n]=(tt[n]||0)+v));return Object.entries(tt).filter(([n])=>assistKw.some(k=>n.includes(k))).reduce((s,[,v])=>s+v,0);});
+    const monthEmerg=months.map(m=>{const tt={};yearRecs.filter(r=>r.date.startsWith(m)).forEach(r=>Object.entries(r.tasks||{}).forEach(([n,v])=>tt[n]=(tt[n]||0)+v));return Object.entries(tt).filter(([n])=>emergKw.some(k=>n.includes(k))).reduce((s,[,v])=>s+v,0);});
+    const monthOC=months.map(m=>{const mr=yearRecs.filter(r=>r.date.startsWith(m));return mr.length?Math.round(mr.filter(r=>r.ocCall==='yes').length/mr.length*100):0;});
+
+    // ===== 1ページ =====
+    jpText(`夜勤業務実績報告　${annualYear}年度 年次`,M,y,15,'#1a2230'); y+=8;
+    jpText('臨床工学部　CE夜勤業務集計システム',M,y,8,'#64748b'); y+=3;
+    hLine(y,'#1a2230',1); y+=5;
+
+    // KPI
+    const kpiItems=[{label:'年間夜勤回数',value:String(nights),unit:'回',color:'#3b82f6'},{label:'年間総業務件数',value:String(grand),unit:'件',color:'#16a34a'},{label:'1夜勤平均',value:String(avg),unit:'件/夜勤',color:'#ea580c'},{label:'補助循環導入',value:String(assistCnt),unit:'件',color:'#dc2626'},{label:'緊急カテ対応',value:String(emergCnt),unit:'件',color:'#06b6d4'}];
+    const cw=CW/kpiItems.length;
+    kpiItems.forEach((item,i)=>{const x=M+cw*i;setFill('#f1f5f9');setDraw('#e2e8f0');pdf.setLineWidth(0.2);pdf.rect(x,y,cw,14,'FD');jpText(item.label,x+cw/2,y+2,6,'#64748b','center');jpText(item.value,x+cw/2,y+6,12,item.color,'center');jpText(item.unit,x+cw/2,y+11,6,'#64748b','center');});
+    y+=17;
+
+    y=sectionHeader('■ 年間業務集中日 TOP3',y); nl(2);
+    peakDays.forEach((d,i)=>{
+      jpText(`${i+1}位`,M+2,y,8,['#f59e0b','#94a3b8','#cd7c4a'][i]);
+      jpText(`${d.date.slice(5).replace('-','/')}（${d.dow}）${d.staff}`,M+15,y,8,'#1e293b');
+      jpText(`${d.total}件`,M+CW,y,9,'#3b82f6','right');
+      hLine(y+5,'#e2e8f0',0.2); y+=5.5;
+    }); nl(3);
+
+    y=sectionHeader('■ 業務種別 上位5項目（年間）',y); nl(2);
+    const maxT5=top5.length?top5[0][1]:1;
+    top5.forEach(([name,val])=>{y=barRow(name,val,maxT5,y,'#3b82f6');}); nl(3);
+
+    y=sectionHeader('■ 時間帯別業務分布（年間累計）',y); nl(2);
+    if(slotSum>0){
+      [['準夜（16:30〜22:00）',slots.early,'#3b82f6'],['深夜（22:00〜翌3:30）',slots.mid,'#7c3aed'],['早朝（翌3:30〜9:00）',slots.late,'#06b6d4']].forEach(([l,v,c])=>{
+        const pct=Math.round(v/slotSum*100),bw=Math.max(1,(CW-60)*pct/100);
+        jpText(l,M,y,8,'#1e293b'); setFill(c); pdf.rect(M+60,y+0.5,bw,4,'F');
+        jpText(`${v}件(${pct}%)`,M+CW,y,8,'#64748b','right'); hLine(y+5.5,'#e2e8f0',0.2); y+=6;
+      });
+    } nl(3);
+
+    y=sectionHeader('■ 緊急・高難度対応（年間）',y,'#dc2626'); nl(2);
+    [`補助循環導入：${assistCnt}件（導入率 ${nights?Math.round(assistCnt/nights*100):0}%）`,`緊急カテーテル対応：${emergCnt}件（対応率 ${nights?Math.round(emergCnt/nights*100):0}%）`,`体外式ペースメーカー挿入：${pacingCnt}件（別集計）`].forEach(t=>{jpText(t,M+2,y,8,'#1e293b');y+=5;}); nl(2);
+
+    y=sectionHeader('■ オンコール状況（年間）',y); nl(2);
+    jpText(`OC担当呼び出し：${ocCall}回（呼び出し率 ${nights?Math.round(ocCall/nights*100):0}%）`,M+2,y,8,'#1e293b'); y+=5;
+    jpText(`OC外呼び出し：${ocExt}回${Object.keys(extCallerMap).length?'　'+Object.entries(extCallerMap).map(([n,v])=>`${n}:${v}回`).join('・'):''}`,M+2,y,8,'#1e293b'); y+=5;
+    jpText(`心外OC呼び出し：${ocCardiacCnt}回`,M+2,y,8,'#1e293b'); y+=5; nl(2);
+
+    if(cardiacReport.length){
+      y=sectionHeader('■ 心外オンコール 担当者別集計（年間）',y); nl(2);
+      cardiacReport.forEach(d=>{const rate=d.oncall?Math.round(d.called/d.oncall*100):0;jpText(`${d.name}：担当${d.oncall}回 / 呼び出し${d.called}回（${rate}%）`,M+2,y,8,'#1e293b');y+=5;}); nl(2);
+    }
+
+    y=sectionHeader('■ 所見・課題',y,'#dc2626'); nl(2);
+    const issues=[
+      assistCnt/nights>=0.5?`・補助循環導入率${Math.round(assistCnt/nights*100)}%と高水準。夜間体制の強化・増員を要する。`:null,
+      emergCnt>nights?'・緊急カテ対応が1夜勤あたり1件超。夜間即応体制の整備が必要。':null,
+      ocExt>0?`・年間${ocExt}回のOC外呼び出しが発生。即応体制の整備が必要。`:null,
+      slots.mid>slots.early&&slots.mid>slots.late?'・深夜帯への業務集中が顕著。仮眠確保・応援体制の整備が望まれる。':null,
+    ].filter(Boolean);
+    if(!issues.length){jpText('・特記事項なし',M+2,y,8,'#64748b');y+=5;}
+    else{issues.forEach(t=>{jpText(t,M+2,y,8,'#1e293b');y+=5;});}
+    jpText(`作成日：${new Date().toLocaleDateString('ja-JP')}`,M+CW,H-M,7,'#64748b','right');
+
+    // ===== 2ページ =====
+    pdf.addPage(); y=M;
+    jpText(`夜勤業務実績報告　${annualYear}年度（詳細①）`,M,y,15,'#1a2230'); y+=8;
+    jpText('臨床工学部　CE夜勤業務集計システム',M,y,8,'#64748b'); y+=3;
+    hLine(y,'#1a2230',1); y+=5;
+
+    y=sectionHeader('■ 月別業務件数推移',y,'#3b82f6'); nl(2);
+    await embedChart((ctx,cw,ch)=>drawLineChart(ctx,cw,ch,monthLabels,monthGrands,'件','#3b82f6','業務件数'),M,y,CW,52);
+    y+=54; nl(2);
+
+    y=sectionHeader('■ 時間帯別業務分布（年間累計）',y); nl(2);
+    if(slotSum>0){
+      await embedChart((ctx,cw,ch)=>drawPieChart(ctx,cw,ch,[{label:'準夜',value:slots.early,color:'#3b82f6'},{label:'深夜',value:slots.mid,color:'#7c3aed'},{label:'早朝',value:slots.late,color:'#06b6d4'}],slotSum),M,y,CW,58);
+      y+=60;
+    } nl(2);
+
+    y=sectionHeader('■ 補助循環導入 / 緊急カテーテル対応　月別推移',y,'#dc2626'); nl(2);
+    await embedChart((ctx,cw,ch)=>drawMultiLineChart(ctx,cw,ch,monthLabels,[{label:'補助循環導入',values:monthAssist,color:'#dc2626'},{label:'緊急カテ対応',values:monthEmerg,color:'#06b6d4'}],'件'),M,y,CW,52);
+    y+=54; nl(2);
+
+    y=sectionHeader('■ 業務件数 ランキング TOP10（年間）',y); nl(2);
+    const maxR=top10.length?top10[0][1]:1;
+    top10.forEach(([name,val])=>{y=barRow(name,val,maxR,y,'#3b82f6',5);});
+    jpText(`作成日：${new Date().toLocaleDateString('ja-JP')}`,M+CW,H-M,7,'#64748b','right');
+
+    // ===== 3ページ =====
+    pdf.addPage(); y=M;
+    jpText(`夜勤業務実績報告　${annualYear}年度（詳細②）`,M,y,15,'#1a2230'); y+=8;
+    jpText('臨床工学部　CE夜勤業務集計システム',M,y,8,'#64748b'); y+=3;
+    hLine(y,'#1a2230',1); y+=5;
+
+    y=sectionHeader('■ OC呼び出し率　月別推移',y,'#ea580c'); nl(2);
+    await embedChart((ctx,cw,ch)=>drawLineChart(ctx,cw,ch,monthLabels,monthOC,'%','#ea580c','呼び出し率'),M,y,CW,52);
+    y+=54; nl(2);
+
+    if(cardiacReport.length){
+      y=sectionHeader('■ 心外オンコール 担当者別集計（年間）',y,'#7c3aed'); nl(2);
+      const maxOC=Math.max(...cardiacReport.map(d=>d.oncall),1);
+      cardiacReport.forEach(d=>{
+        const rate=d.oncall?Math.round(d.called/d.oncall*100):0;
+        jpText(d.name,M,y,8,'#1e293b');
+        const bwO=Math.max(1,(CW-60)*d.oncall/maxOC);
+        setFill('#06b6d4'); pdf.rect(M+30,y+0.5,bwO,3,'F');
+        const bwC=d.called?Math.max(1,(CW-60)*d.called/maxOC):0;
+        setFill('#dc2626'); if(bwC) pdf.rect(M+30,y+4,bwC,3,'F');
+        jpText(`担当${d.oncall}回`,M+CW-28,y,7,'#06b6d4');
+        jpText(`呼出${d.called}回(${rate}%)`,M+CW,y+4,7,'#dc2626','right');
+        hLine(y+8,'#e2e8f0',0.2); y+=9;
+      });
+    }
+
+    jpText(`作成日：${new Date().toLocaleDateString('ja-JP')}`,M+CW,H-M,7,'#64748b','right');
+
+    pdf.save(`CE夜勤業務実績報告_${annualYear}年度.pdf`);
+  } catch(e) {
+    console.error(e);
+    showToast('⚠ PDF生成エラー：'+e.message,'#ff6b6b');
+  } finally {
+    if(btn){btn.textContent='🖨️ PDF出力（印刷）';btn.disabled=false;}
+  }
 }
 
 function copyAnnualReport() {
@@ -3399,8 +3611,283 @@ function drawHBarChart(ctx, w, h, data) {
   });
 }
 
-function printReport() {
-  window.print();
+async function printReport() {
+  const btn = document.querySelector('.copy-report-btn[onclick="printReport()"]');
+  const origText = btn ? btn.textContent : '';
+  if (btn) { btn.textContent = '⏳ PDF生成中...'; btn.disabled = true; }
+
+  try {
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+    const W = 210, H = 297, M = 15; // A4サイズ・マージン
+    const CW = W - M * 2; // コンテンツ幅
+
+    // フォント設定（日本語はhtml2canvasで描画）
+    pdf.setFont('helvetica');
+
+    // ===== ヘルパー関数 =====
+    let y = M;
+    const nl = (h = 5) => { y += h; };
+    const checkPage = (needed = 10) => { if (y + needed > H - M) { pdf.addPage(); y = M; } };
+
+    const setColor = (hex) => {
+      const r = parseInt(hex.slice(1,3),16), g = parseInt(hex.slice(3,5),16), b = parseInt(hex.slice(5,7),16);
+      pdf.setTextColor(r,g,b);
+    };
+    const setFill = (hex) => {
+      const r = parseInt(hex.slice(1,3),16), g = parseInt(hex.slice(3,5),16), b = parseInt(hex.slice(5,7),16);
+      pdf.setFillColor(r,g,b);
+    };
+    const setDraw = (hex) => {
+      const r = parseInt(hex.slice(1,3),16), g = parseInt(hex.slice(3,5),16), b = parseInt(hex.slice(5,7),16);
+      pdf.setDrawColor(r,g,b);
+    };
+
+    // 日本語テキストをCanvasで描画してPDFに埋め込む関数
+    const jpText = (text, x, fy, size=9, color='#1e293b', align='left') => {
+      if (!text) return;
+      const canvas = document.createElement('canvas');
+      const scale = 3;
+      const fontSize = size * scale;
+      canvas.height = Math.ceil(fontSize * 1.6);
+      const ctx = canvas.getContext('2d');
+      ctx.font = `${fontSize}px "Noto Sans JP", sans-serif`;
+      const tw = ctx.measureText(text).width;
+      canvas.width = Math.min(Math.ceil(tw) + 8, CW * 3.78 * scale);
+      ctx.clearRect(0,0,canvas.width,canvas.height);
+      ctx.font = `${fontSize}px "Noto Sans JP", sans-serif`;
+      const r=parseInt(color.slice(1,3),16),g=parseInt(color.slice(3,5),16),b=parseInt(color.slice(5,7),16);
+      ctx.fillStyle=`rgb(${r},${g},${b})`; ctx.textBaseline='top';
+      let dx=2;
+      if(align==='right'){ctx.textAlign='right';dx=canvas.width-2;}
+      else if(align==='center'){ctx.textAlign='center';dx=canvas.width/2;}
+      ctx.fillText(text,dx,2);
+      const imgData=canvas.toDataURL('image/png');
+      const pW=canvas.width/scale/3.78, pH=canvas.height/scale/3.78;
+      let px=x;
+      if(align==='right') px=x-pW;
+      else if(align==='center') px=x-pW/2;
+      pdf.addImage(imgData,'PNG',px,fy-pH*0.1,pW,pH);
+    };
+
+    const sectionHeader = (title, fy, bg='#1a2230') => {
+      checkPage(12);
+      setFill(bg); pdf.setLineWidth(0);
+      pdf.rect(M, fy, CW, 7, 'F');
+      jpText(title, M+3, fy+1.5, 9, '#ffffff');
+      return fy + 8;
+    };
+
+    const kpiCards = (items, fy, cardH=14) => {
+      const cw = CW / items.length;
+      items.forEach((item, i) => {
+        const x = M + cw * i;
+        setFill('#f1f5f9'); setDraw('#e2e8f0');
+        pdf.setLineWidth(0.2);
+        pdf.rect(x, fy, cw, cardH, 'FD');
+        jpText(item.label, x + cw/2, fy+2, 7, '#64748b', 'center');
+        jpText(item.value, x + cw/2, fy+6, 13, item.color, 'center');
+        jpText(item.unit, x + cw/2, fy+11, 7, '#64748b', 'center');
+      });
+      return fy + cardH + 3;
+    };
+
+    const hLine = (fy, color='#e2e8f0', lw=0.3) => {
+      setDraw(color); pdf.setLineWidth(lw);
+      pdf.line(M, fy, M+CW, fy);
+    };
+
+    const barRow = (label, val, maxVal, fy, barColor='#3b82f6', rowH=5.5) => {
+      checkPage(rowH + 2);
+      const short = label.length > 25 ? label.slice(0,24)+'…' : label;
+      jpText(short, M, fy, 7.5, '#1e293b');
+      const barW = Math.max(1, (CW-50) * val/maxVal);
+      setFill(barColor);
+      pdf.rect(M+50, fy+0.5, barW, rowH-1.5, 'F');
+      jpText(val+'件', M+CW, fy, 7.5, '#64748b', 'right');
+      hLine(fy+rowH, '#e2e8f0', 0.2);
+      return fy + rowH;
+    };
+
+    // グラフをCanvas描画してPDFに埋め込む
+    const embedChart = async (drawFn, x, fy, cw, ch) => {
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.round(cw * 3.78 * 2);
+      canvas.height = Math.round(ch * 3.78 * 2);
+      const ctx = canvas.getContext('2d');
+      ctx.scale(2,2);
+      drawFn(ctx, cw * 3.78, ch * 3.78);
+      const imgData = canvas.toDataURL('image/png');
+      pdf.addImage(imgData, 'PNG', x, fy, cw, ch);
+      return fy + ch;
+    };
+
+    // ===== データ取得 =====
+    const allRecs = getRecords();
+    const curRecs = allRecs.filter(r => r.date && r.date.startsWith(fmtYM(sMonth)));
+    const prevMonth = new Date(sMonth); prevMonth.setMonth(prevMonth.getMonth()-1);
+    const prevRecs = allRecs.filter(r => r.date && r.date.startsWith(fmtYM(prevMonth)));
+    const grand = curRecs.reduce((s,r)=>s+Object.values(r.tasks||{}).reduce((a,v)=>a+v,0)+(r.freeTasks||[]).reduce((a,ft)=>a+(ft.count||1),0),0);
+    const prevGrand = prevRecs.reduce((s,r)=>s+Object.values(r.tasks||{}).reduce((a,v)=>a+v,0)+(r.freeTasks||[]).reduce((a,ft)=>a+(ft.count||1),0),0);
+    const nights = curRecs.length;
+    const avg = nights ? (grand/nights).toFixed(1) : 0;
+    const taskTot = {};
+    curRecs.forEach(r=>{ Object.entries(r.tasks||{}).forEach(([n,v])=>taskTot[n]=(taskTot[n]||0)+v); (r.freeTasks||[]).forEach(ft=>{ if(ft.name) taskTot[ft.name]=(taskTot[ft.name]||0)+(ft.count||1); }); });
+    const slots = {early:0,mid:0,late:0};
+    curRecs.forEach(r=>{ if(r.taskSlots) Object.values(r.taskSlots).forEach(s=>{ slots.early+=s.early||0; slots.mid+=s.mid||0; slots.late+=s.late||0; }); });
+    const slotSum = slots.early+slots.mid+slots.late;
+    const assistKw = ['V-A ECMO開始','V-V ECMO開始','IABP開始','Impella CP導入','Impella 5.5導入'];
+    const emergKw  = ['緊急カテーテル','心筋生検','心嚢穿刺'];
+    const assistCnt = Object.entries(taskTot).filter(([n])=>assistKw.some(k=>n.includes(k))).reduce((s,[,v])=>s+v,0);
+    const emergCnt  = Object.entries(taskTot).filter(([n])=>emergKw.some(k=>n.includes(k))).reduce((s,[,v])=>s+v,0);
+    const pacingCnt = taskTot['体外式ペースメーカー挿入']||0;
+    const ocCall = curRecs.filter(r=>r.ocCall==='yes').length;
+    const ocExt  = curRecs.filter(r=>r.ocExt==='yes').length;
+    const ocCardiacCnt = curRecs.filter(r=>r.ocCardiac==='yes').length;
+    const ocRate = nights ? Math.round(ocCall/nights*100) : 0;
+    const extCallerMap = {};
+    curRecs.forEach(r=>{ if(r.ocExt==='yes')(r.extCallers||[]).forEach(s=>{ extCallerMap[s]=(extCallerMap[s]||0)+1; }); });
+    const peakDays = [...curRecs].map(r=>({ date:r.date, dow:['日','月','火','水','木','金','土'][new Date(r.date+'T00:00:00').getDay()], staff:(r.staff||[]).join('・'), total:Object.values(r.tasks||{}).reduce((s,v)=>s+v,0)+(r.freeTasks||[]).reduce((s,ft)=>s+(ft.count||1),0) })).sort((a,b)=>b.total-a.total).slice(0,3);
+    const top5 = Object.entries(taskTot).sort((a,b)=>b[1]-a[1]).slice(0,5);
+    const top10 = Object.entries(taskTot).sort((a,b)=>b[1]-a[1]).slice(0,10);
+    const cardiacReport = CARDIAC_ONCALL_STAFF.map(n=>({ name:n, oncall:curRecs.filter(r=>(r.cardiacOncall||[]).includes(n)).length, called:curRecs.filter(r=>(r.cardiacOncall||[]).includes(n)&&r.ocCardiac==='yes').length })).filter(d=>d.oncall>0);
+    const allMonths = [...new Set(allRecs.map(r=>r.date.slice(0,7)))].sort().slice(-12);
+    const allMonthLabels = allMonths.map(m=>m.slice(5)+'月');
+    const allMonthGrands = allMonths.map(m=>allRecs.filter(r=>r.date.startsWith(m)).reduce((s,r)=>s+Object.values(r.tasks||{}).reduce((a,v)=>a+v,0)+(r.freeTasks||[]).reduce((a,ft)=>a+(ft.count||1),0),0));
+    const allMonthAssist = allMonths.map(m=>{ const tt={}; allRecs.filter(r=>r.date.startsWith(m)).forEach(r=>Object.entries(r.tasks||{}).forEach(([n,v])=>tt[n]=(tt[n]||0)+v)); return Object.entries(tt).filter(([n])=>assistKw.some(k=>n.includes(k))).reduce((s,[,v])=>s+v,0); });
+    const allMonthEmerg  = allMonths.map(m=>{ const tt={}; allRecs.filter(r=>r.date.startsWith(m)).forEach(r=>Object.entries(r.tasks||{}).forEach(([n,v])=>tt[n]=(tt[n]||0)+v)); return Object.entries(tt).filter(([n])=>emergKw.some(k=>n.includes(k))).reduce((s,[,v])=>s+v,0); });
+
+    const titleStr = `夜勤業務実績報告　${fmtYMDisp(sMonth)}`;
+
+    // ===== 1ページ目 =====
+    // タイトル
+    jpText(titleStr, M, y, 15, '#1a2230'); y += 8;
+    jpText('臨床工学部　CE夜勤業務集計システム', M, y, 8, '#64748b'); y += 3;
+    hLine(y, '#1a2230', 1); y += 5;
+
+    // KPI
+    y = kpiCards([
+      { label:'夜勤回数', value:String(nights), unit:'回', color:'#3b82f6' },
+      { label:'総業務件数', value:String(grand), unit:'件', color:'#16a34a' },
+      { label:'1夜勤平均', value:String(avg), unit:'件/夜勤', color:'#ea580c' },
+      { label:'OC呼び出し', value:String(ocCall), unit:`外:${ocExt}回 心外:${ocCardiacCnt}回`, color:'#dc2626' },
+    ], y);
+
+    // 業務集中日TOP3
+    y = sectionHeader('■ 業務集中日 TOP3', y); nl(2);
+    const medals = ['🥇','🥈','🥉'];
+    peakDays.forEach((d,i) => {
+      jpText(`${i+1}位`, M+2, y, 8, ['#f59e0b','#94a3b8','#cd7c4a'][i]);
+      jpText(`${d.date.slice(5).replace('-','/')}（${d.dow}）${d.staff}`, M+15, y, 8, '#1e293b');
+      jpText(`${d.total}件`, M+CW, y, 9, '#3b82f6', 'right');
+      hLine(y+5, '#e2e8f0', 0.2); y += 5.5;
+    }); nl(3);
+
+    // 業務種別TOP5
+    y = sectionHeader('■ 業務種別 上位5項目', y); nl(2);
+    const maxTop5 = top5.length ? top5[0][1] : 1;
+    top5.forEach(([name,val]) => { y = barRow(name, val, maxTop5, y, '#3b82f6'); }); nl(3);
+
+    // 時間帯別
+    y = sectionHeader('■ 時間帯別 業務発生状況', y); nl(2);
+    if (slotSum > 0) {
+      [['準夜（16:30〜22:00）', slots.early, '#3b82f6'],['深夜（22:00〜翌3:30）', slots.mid, '#7c3aed'],['早朝（翌3:30〜9:00）', slots.late, '#06b6d4']].forEach(([l,v,c]) => {
+        const pct = Math.round(v/slotSum*100);
+        const bw = Math.max(1, (CW-60)*pct/100);
+        jpText(l, M, y, 8, '#1e293b');
+        setFill(c); pdf.rect(M+60, y+0.5, bw, 4, 'F');
+        jpText(`${v}件(${pct}%)`, M+CW, y, 8, '#64748b', 'right');
+        hLine(y+5.5, '#e2e8f0', 0.2); y += 6;
+      });
+    } else {
+      jpText('時間帯データ未記録', M+2, y, 8, '#94a3b8'); y += 6;
+    }
+    nl(3);
+
+    // 緊急対応
+    y = sectionHeader('■ 緊急・高難度対応', y, '#dc2626'); nl(2);
+    [
+      [`補助循環導入：${assistCnt}件（導入率 ${nights?Math.round(assistCnt/nights*100):0}%）`, '#dc2626'],
+      [`　(V-A ECMO・V-V ECMO・IABP・Impella 開始・導入の合計)`, '#64748b'],
+      [`緊急カテーテル対応：${emergCnt}件（対応率 ${nights?Math.round(emergCnt/nights*100):0}%）`, '#dc2626'],
+      [`　(緊急CAG/PCI/EVT・心筋生検・心嚢穿刺の合計)`, '#64748b'],
+      [`体外式ペースメーカー挿入：${pacingCnt}件（別集計）`, '#ea580c'],
+    ].forEach(([t,c]) => { jpText(t, M+2, y, 8, c); y += 5; }); nl(2);
+
+    // OC状況
+    y = sectionHeader('■ オンコール状況', y); nl(2);
+    jpText(`OC担当呼び出し：${ocCall}回（呼び出し率 ${ocRate}%）`, M+2, y, 8, '#1e293b'); y += 5;
+    jpText(`OC外呼び出し：${ocExt}回${Object.keys(extCallerMap).length?'　'+Object.entries(extCallerMap).map(([n,v])=>`${n}:${v}回`).join('・'):''}`, M+2, y, 8, '#1e293b'); y += 5;
+    jpText(`心外OC呼び出し：${ocCardiacCnt}回`, M+2, y, 8, '#1e293b'); y += 5; nl(2);
+
+    // 心外OC担当者
+    if (cardiacReport.length) {
+      y = sectionHeader('■ 心外オンコール 担当者別集計', y); nl(2);
+      cardiacReport.forEach(d => {
+        const rate = d.oncall ? Math.round(d.called/d.oncall*100) : 0;
+        jpText(`${d.name}：担当${d.oncall}回 / 呼び出し${d.called}回（${rate}%）`, M+2, y, 8, '#1e293b'); y += 5;
+      }); nl(2);
+    }
+
+    // 所見
+    y = sectionHeader('■ 所見・課題', y, '#dc2626'); nl(2);
+    const issues = [
+      ocRate >= 50 ? `・OC呼び出し率が${ocRate}%と高水準。夜勤体制の見直しが必要。` : null,
+      ocExt > 0 ? `・OC外呼び出しが${ocExt}回発生。即応体制の整備が必要。` : null,
+      prevGrand>0&&grand>prevGrand*1.2 ? `・前月比${Math.round((grand-prevGrand)/prevGrand*100)}%増と業務量が急増。増員検討を要する。` : null,
+      assistCnt>nights ? `・補助循環導入が1夜勤あたり1件超。夜間体制の強化・増員を要する。` : null,
+      emergCnt>nights ? `・緊急カテ対応が1夜勤あたり1件超。夜間即応体制の整備が必要。` : null,
+      slots.mid>slots.early&&slots.mid>slots.late ? `・深夜帯への業務集中が顕著。仮眠確保・応援体制の整備が望まれる。` : null,
+    ].filter(Boolean);
+    if (issues.length === 0) { jpText('・特記事項なし', M+2, y, 8, '#64748b'); y += 5; }
+    else { issues.forEach(t => { jpText(t, M+2, y, 8, '#1e293b'); y += 5; }); }
+
+    jpText(`作成日：${new Date().toLocaleDateString('ja-JP')}`, M+CW, H-M, 7, '#64748b', 'right');
+
+    // ===== 2ページ目：グラフ =====
+    pdf.addPage();
+    y = M;
+    jpText(`夜勤業務実績報告　${fmtYMDisp(sMonth)}　（詳細グラフ）`, M, y, 15, '#1a2230'); y += 8;
+    jpText('臨床工学部　CE夜勤業務集計システム', M, y, 8, '#64748b'); y += 3;
+    hLine(y, '#1a2230', 1); y += 5;
+
+    // 月別業務件数推移グラフ
+    y = sectionHeader('■ 月別業務件数推移', y, '#3b82f6'); nl(2);
+    await embedChart((ctx, cw, ch) => drawLineChart(ctx, cw, ch, allMonthLabels, allMonthGrands, '件', '#3b82f6', '業務件数'), M, y, CW, 50);
+    y += 52; nl(2);
+
+    // 時間帯別円グラフ
+    y = sectionHeader('■ 時間帯別業務分布', y); nl(2);
+    if (slotSum > 0) {
+      await embedChart((ctx, cw, ch) => drawPieChart(ctx, cw, ch, [{label:'準夜',value:slots.early,color:'#3b82f6'},{label:'深夜',value:slots.mid,color:'#7c3aed'},{label:'早朝',value:slots.late,color:'#06b6d4'}], slotSum), M, y, CW, 55);
+      y += 57;
+    } else {
+      jpText('時間帯データ未記録', M+2, y, 8, '#94a3b8'); y += 10;
+    }
+    nl(2);
+
+    // 補助循環・緊急カテ推移
+    y = sectionHeader('■ 補助循環導入 / 緊急カテーテル対応　月別推移', y, '#dc2626'); nl(2);
+    await embedChart((ctx, cw, ch) => drawMultiLineChart(ctx, cw, ch, allMonthLabels, [{label:'補助循環導入',values:allMonthAssist,color:'#dc2626'},{label:'緊急カテ対応',values:allMonthEmerg,color:'#06b6d4'}], '件'), M, y, CW, 50);
+    y += 52; nl(2);
+
+    // 業務件数ランキングTOP10
+    y = sectionHeader('■ 業務件数 ランキング TOP10', y); nl(2);
+    const maxRank = top10.length ? top10[0][1] : 1;
+    top10.forEach(([name,val]) => { y = barRow(name, val, maxRank, y, '#3b82f6', 5); });
+
+    jpText(`作成日：${new Date().toLocaleDateString('ja-JP')}`, M+CW, H-M, 7, '#64748b', 'right');
+
+    // ===== 保存 =====
+    const month = fmtYM(sMonth).replace('-','');
+    pdf.save(`CE夜勤業務実績報告_${month}.pdf`);
+
+  } catch(e) {
+    console.error(e);
+    showToast('⚠ PDF生成エラー：'+e.message, '#ff6b6b');
+  } finally {
+    if (btn) { btn.textContent = origText; btn.disabled = false; }
+  }
 }
 
 function copyReport() {
@@ -3658,6 +4145,15 @@ async function restoreFromSheet() {
   btn.innerHTML = '☁️ スプレッドシートからアプリに復元';
 }
 
+
+function copyAnnualReport() {
+  const mainText=document.getElementById('annual-report-text-area')?.innerText||window._annualReportText||'';
+  const extra=document.getElementById('annual-report-extra')?.innerText?.trim();
+  const full=extra?mainText+'\n\n■ 追記\n'+extra:mainText;
+  navigator.clipboard.writeText(full).then(()=>showToast('📋 クリップボードにコピーしました')).catch(()=>{
+    const ta=document.createElement('textarea');ta.value=full;document.body.appendChild(ta);ta.select();document.execCommand('copy');document.body.removeChild(ta);showToast('📋 コピーしました');
+  });
+}
 
 function fmtYM(d) { return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'); }
 function fmtYMDisp(d) { return d.getFullYear()+'年'+(d.getMonth()+1)+'月'; }
