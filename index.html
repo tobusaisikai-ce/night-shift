@@ -98,7 +98,10 @@ input:focus, select:focus, textarea:focus { border-color: var(--accent); box-sha
 textarea { height: 76px; resize: vertical; font-size: 13px; line-height: 1.6; }
 
 /* ===== STAFF GRID ===== */
-.staff-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 6px; }
+.staff-grid { display: flex; flex-direction: column; gap: 10px; }
+.staff-group { background: var(--surface); border: 1.5px solid var(--border); border-radius: 12px; overflow: hidden; }
+.staff-group-label { font-size: 10px; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; color: #fff; background: var(--text-muted); padding: 5px 12px; display: block; }
+.staff-group-chips { display: grid; grid-template-columns: repeat(3,1fr); gap: 5px; padding: 8px; }
 .s-chip { background: var(--surface2); border: 1.5px solid var(--border); border-radius: 8px; padding: 9px 4px; font-size: 12px; font-weight: 500; color: var(--text-muted); cursor: pointer; text-align: center; transition: all 0.15s; user-select: none; line-height: 1.2; }
 .s-chip:active { transform: scale(0.95); }
 .s-chip.sel { background: var(--accent-dim); border-color: var(--accent); color: var(--accent); font-weight: 700; }
@@ -587,7 +590,7 @@ textarea { height: 76px; resize: vertical; font-size: 13px; line-height: 1.6; }
       <div class="oncall-box red-box">
         <div class="oncall-box-title red">🫀 心外オンコール</div>
         <div class="field-label" style="margin-bottom:6px;font-size:11px">担当者</div>
-        <div class="staff-grid" id="cardiac-oncall-grid"></div>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:5px" id="cardiac-oncall-grid"></div>
 
         <div style="margin-top:11px">
           <div class="field-label" style="margin-bottom:6px;font-size:11px">呼び出し</div>
@@ -773,13 +776,15 @@ textarea { height: 76px; resize: vertical; font-size: 13px; line-height: 1.6; }
 
 <script>
 // ===================== DATA =====================
-const STAFF = [
-  '伊藤','本間（俊）','矢島','野口','原尻',
-  '島田','宍戸','本間（成）','伊藤（大）','川原','西川','内山',
-  '相馬','山田（麻）','鈴木','佐藤（亜）','川崎','山田（裕）',
-  '小川','杉山','笹岡','宮本','佐藤（友）','角田',
-  '高澤','小澤','安田','林','海野','有本'
+const STAFF_GROUPS = [
+  { label:'OPE', color:'#6366f1', members:['伊藤','本間（俊）','矢島'] },
+  { label:'病棟・HD', color:'#0891b2', members:['野口','原尻','内山','島田','宍戸','本間（成）','伊藤（大）','川原','西川','小澤'] },
+  { label:'救急', color:'#dc2626', members:['相馬','山田（麻）','鈴木','佐藤（亜）'] },
+  { label:'虚血', color:'#d97706', members:['川崎','山田（裕）','小川','杉山'] },
+  { label:'不整脈', color:'#7c3aed', members:['笹岡','宮本','佐藤（友）','角田','高澤'] },
+  { label:'ローテーション', color:'#059669', members:['安田','林','海野','有本'] },
 ];
+const STAFF = STAFF_GROUPS.flatMap(g=>g.members);
 
 const TASK_GROUPS = [
   { id:'catheter', label:'緊急カテーテル', cat:'r', tasks:[
@@ -915,27 +920,70 @@ function getNextDate(fromDate) {
   const nextStr = next.toISOString().slice(0,10);
   return nextStr > today ? today : nextStr;
 }
-function renderStaff() {
-  const g = document.getElementById('staff-grid');
-  g.innerHTML = '';
-  STAFF.forEach(n => {
-    const el = document.createElement('div');
-    el.className = 's-chip' + (selStaff.has(n) ? ' sel' : '');
-    el.textContent = n;
-    el.onclick = () => { selStaff.has(n) ? selStaff.delete(n) : selStaff.add(n); el.classList.toggle('sel'); updateProg(); };
-    g.appendChild(el);
+function renderGroupedChips(container, selSet, clickFn, selStyle) {
+  container.innerHTML = '';
+  STAFF_GROUPS.forEach(grp => {
+    const wrap = document.createElement('div');
+    wrap.className = 'staff-group';
+    wrap.style.borderColor = grp.color + '44';
+
+    // グループラベル帯（チームカラー）
+    const lbl = document.createElement('div');
+    lbl.className = 'staff-group-label';
+    lbl.style.background = grp.color;
+    lbl.textContent = grp.label;
+    wrap.appendChild(lbl);
+
+    // チップグリッド
+    const chips = document.createElement('div');
+    chips.className = 'staff-group-chips';
+    grp.members.forEach(n => {
+      const el = document.createElement('div');
+      const isSel = selSet.has(n);
+      el.className = 's-chip' + (isSel ? ' sel' : '');
+      if (isSel && selStyle) {
+        el.style.cssText = selStyle;
+      } else if (isSel) {
+        el.style.cssText = `background:${grp.color}18;border-color:${grp.color};color:${grp.color};font-weight:700`;
+      }
+      el.textContent = n;
+      el.onclick = () => {
+        clickFn(n, el, grp.color);
+      };
+      chips.appendChild(el);
+    });
+    wrap.appendChild(chips);
+    container.appendChild(wrap);
   });
 }
+
+function renderStaff() {
+  const g = document.getElementById('staff-grid');
+  renderGroupedChips(g, selStaff, (n, el, color) => {
+    selStaff.has(n) ? selStaff.delete(n) : selStaff.add(n);
+    if (selStaff.has(n)) {
+      el.className = 's-chip sel';
+      el.style.cssText = `background:${color}18;border-color:${color};color:${color};font-weight:700`;
+    } else {
+      el.className = 's-chip';
+      el.style.cssText = '';
+    }
+    updateProg();
+  }, '');
+}
+
 function renderOncall() {
   const g = document.getElementById('oncall-grid');
-  g.innerHTML = '';
-  STAFF.forEach(n => {
-    const el = document.createElement('div');
-    el.className = 's-chip' + (selOncall.has(n) ? ' sel-g' : '');
-    el.textContent = n;
-    el.onclick = () => { selOncall.has(n) ? selOncall.delete(n) : selOncall.add(n); el.classList.toggle('sel-g'); };
-    g.appendChild(el);
-  });
+  renderGroupedChips(g, selOncall, (n, el, color) => {
+    selOncall.has(n) ? selOncall.delete(n) : selOncall.add(n);
+    if (selOncall.has(n)) {
+      el.className = 's-chip sel';
+      el.style.cssText = `background:${color}18;border-color:${color};color:${color};font-weight:700`;
+    } else {
+      el.className = 's-chip';
+      el.style.cssText = '';
+    }
+  }, '');
 }
 
 function renderCardiacOncall() {
@@ -954,25 +1002,21 @@ function renderCardiacOncall() {
   });
 }
 
-// オンコール外呼び出し：全スタッフから選択
+// オンコール外呼び出し：全スタッフからグループ表示で選択
 function renderExtCallerGrid() {
   const g = document.getElementById('ext-caller-grid');
   if (!g) return;
-  g.innerHTML = '';
-  STAFF.forEach(n => {
-    const el = document.createElement('div');
-    el.className = 's-chip' + (selExtCallers.has(n) ? ' sel' : '');
+  renderGroupedChips(g, selExtCallers, (n, el, color) => {
+    selExtCallers.has(n) ? selExtCallers.delete(n) : selExtCallers.add(n);
     if (selExtCallers.has(n)) {
-      el.style.cssText = 'background:rgba(234,88,12,0.15);border-color:var(--orange);color:var(--orange);font-weight:700';
+      el.className = 's-chip sel';
+      el.style.cssText = `background:${color}18;border-color:${color};color:${color};font-weight:700`;
+    } else {
+      el.className = 's-chip';
+      el.style.cssText = '';
     }
-    el.textContent = n;
-    el.onclick = () => {
-      selExtCallers.has(n) ? selExtCallers.delete(n) : selExtCallers.add(n);
-      renderExtCallerGrid();
-      updateProg();
-    };
-    g.appendChild(el);
-  });
+    updateProg();
+  }, '');
 }
 
 
