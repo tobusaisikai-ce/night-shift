@@ -1456,6 +1456,31 @@ function resetForm(fromDate) {
 // ===================== STORAGE =====================
 function getRecords() { try { return JSON.parse(localStorage.getItem('ce_v3')||'[]'); } catch { return []; } }
 
+// ===================== 時間帯合計ヘルパー =====================
+// recordのtaskSlotsから {early, mid, late} の合計を返す（②方式復元データにも対応）
+function getRecordSlotTotals(r) {
+  const result = { early: 0, mid: 0, late: 0 };
+  if (!r.taskSlots) return result;
+  Object.values(r.taskSlots).forEach(s => {
+    result.early += s.early || 0;
+    result.mid   += s.mid   || 0;
+    result.late  += s.late  || 0;
+  });
+  return result;
+}
+
+// 複数recordsからスロット合計を集約
+function sumSlots(recs) {
+  const result = { early: 0, mid: 0, late: 0 };
+  recs.forEach(r => {
+    const s = getRecordSlotTotals(r);
+    result.early += s.early;
+    result.mid   += s.mid;
+    result.late  += s.late;
+  });
+  return result;
+}
+
 // ===================== HISTORY =====================
 function renderHistory() {
   const ym = fmtYM(hMonth);
@@ -1647,11 +1672,10 @@ function renderStats() {
     if(r.ocCardiac==='yes') (r.cardiacOncall||[]).forEach(s=>{ cardiacCalledCnt[s]=(cardiacCalledCnt[s]||0)+1; });
     // 時間帯集計
     if (r.taskSlots) {
-      Object.values(r.taskSlots).forEach(slots => {
-        slotTot.early += slots.early||0;
-        slotTot.mid += slots.mid||0;
-        slotTot.late += slots.late||0;
-      });
+      const s = getRecordSlotTotals(r);
+      slotTot.early += s.early;
+      slotTot.mid   += s.mid;
+      slotTot.late  += s.late;
     }
   });
   const sorted=Object.entries(taskTot).sort((a,b)=>b[1]-a[1]);
@@ -1795,8 +1819,7 @@ function exportXLSX(mode) {
     const taskCols = allTasks.map(t=>r.tasks?.[t]||0);
     const freeCols = allFreeNames.map(n=>{ const ft=(r.freeTasks||[]).find(f=>f.name===n); return ft?ft.count||1:0; });
     const total = taskCols.reduce((s,v)=>s+v,0)+freeCols.reduce((s,v)=>s+v,0);
-    const slots = { early:0, mid:0, late:0 };
-    if (r.taskSlots) Object.values(r.taskSlots).forEach(s=>{ slots.early+=s.early||0; slots.mid+=s.mid||0; slots.late+=s.late||0; });
+    const slots = getRecordSlotTotals(r);
     return [r.date, dow, (r.staff||[]).join('・'), (r.oncall||[]).join('・'),
       r.ocCall==='yes'?'あり':r.ocCall==='no'?'なし':'',
       r.ocExt==='yes'?'あり':r.ocExt==='no'?'なし':'',
@@ -1821,8 +1844,7 @@ function exportXLSX(mode) {
     const ocC = mr.filter(r=>r.ocCall==='yes').length;
     const ocE = mr.filter(r=>r.ocExt==='yes').length;
     const ocCa = mr.filter(r=>r.ocCardiac==='yes').length;
-    const slots = { early:0, mid:0, late:0 };
-    mr.forEach(r=>{ if(r.taskSlots) Object.values(r.taskSlots).forEach(s=>{ slots.early+=s.early||0; slots.mid+=s.mid||0; slots.late+=s.late||0; }); });
+    const slots = sumSlots(mr);
     const cardiacCols = CARDIAC_ONCALL_STAFF.map(n=>mr.filter(r=>(r.cardiacOncall||[]).includes(n)).length)
       .concat(CARDIAC_ONCALL_STAFF.map(n=>mr.filter(r=>(r.cardiacOncall||[]).includes(n)&&r.ocCardiac==='yes').length));
     return [m, mr.length, grand, grand?+(grand/mr.length).toFixed(1):0, ocC, ocE, ocCa, slots.early, slots.mid, slots.late, ...cardiacCols, ...taskSums,...freeSums];
@@ -1922,8 +1944,7 @@ function exportXLSX(mode) {
       mr.forEach(r=>Object.entries(r.tasks||{}).forEach(([n,v])=>taskTotM[n]=(taskTotM[n]||0)+v));
       const assistM = Object.entries(taskTotM).filter(([n])=>assistKwA.some(k=>n.includes(k))).reduce((s,[,v])=>s+v,0);
       const emergM = Object.entries(taskTotM).filter(([n])=>emergKwA.some(k=>n.includes(k))).reduce((s,[,v])=>s+v,0);
-      const slots = {early:0,mid:0,late:0};
-      mr.forEach(r=>{ if(r.taskSlots) Object.values(r.taskSlots).forEach(s=>{ slots.early+=s.early||0; slots.mid+=s.mid||0; slots.late+=s.late||0; }); });
+      const slots = sumSlots(mr);
       const peakDay = mr.map(r=>({date:r.date,total:Object.values(r.tasks||{}).reduce((s,v)=>s+v,0)+(r.freeTasks||[]).reduce((s,ft)=>s+(ft.count||1),0)})).sort((a,b)=>b.total-a.total)[0];
       annualRows.push([m, mr.length, grand, grand?+(grand/mr.length).toFixed(1):0, ocC, ocE, ocCa, assistM, emergM, slots.early, slots.mid, slots.late, peakDay?.date||'', peakDay?.total||0]);
     });
@@ -2664,8 +2685,7 @@ function renderAnnualInsight() {
   const emergCnt = Object.entries(taskTot).filter(([n])=>emergKw.some(k=>n.includes(k))).reduce((s,[,v])=>s+v,0);
   const ocCallCnt= yearRecs.filter(r=>r.ocCall==='yes').length;
   const ocExtCnt = yearRecs.filter(r=>r.ocExt==='yes').length;
-  const slots    = {early:0,mid:0,late:0};
-  yearRecs.forEach(r=>{ if(r.taskSlots) Object.values(r.taskSlots).forEach(s=>{ slots.early+=s.early||0; slots.mid+=s.mid||0; slots.late+=s.late||0; }); });
+  const slots    = sumSlots(yearRecs);
   const top3     = Object.entries(taskTot).sort((a,b)=>b[1]-a[1]).slice(0,3);
   const months   = [...Array(12)].map((_,i)=>String(annualYear)+'-'+String(i+1).padStart(2,'0'));
   const monthLabels = months.map(m=>m.slice(5)+'月');
@@ -2800,8 +2820,7 @@ function renderAnnualReport() {
   const emergCnt =Object.entries(taskTot).filter(([n])=>emergKw.some(k=>n.includes(k))).reduce((s,[,v])=>s+v,0);
   const pacingCnt=taskTot['体外式ペースメーカー挿入']||0;
   const ocCallCnt=yearRecs.filter(r=>r.ocCall==='yes').length, ocExtCnt=yearRecs.filter(r=>r.ocExt==='yes').length, ocCardiacCnt=yearRecs.filter(r=>r.ocCardiac==='yes').length;
-  const slots={early:0,mid:0,late:0};
-  yearRecs.forEach(r=>{ if(r.taskSlots) Object.values(r.taskSlots).forEach(s=>{ slots.early+=s.early||0; slots.mid+=s.mid||0; slots.late+=s.late||0; }); });
+  const slots=sumSlots(yearRecs);
   const slotSum=slots.early+slots.mid+slots.late;
   const top5=Object.entries(taskTot).sort((a,b)=>b[1]-a[1]).slice(0,5);
   const peakDay=yearRecs.map(r=>({date:r.date,dow:['日','月','火','水','木','金','土'][new Date(r.date+'T00:00:00').getDay()],staff:(r.staff||[]).join('・'),total:Object.values(r.tasks||{}).reduce((s,v)=>s+v,0)+(r.freeTasks||[]).reduce((s,ft)=>s+(ft.count||1),0)})).sort((a,b)=>b.total-a.total).slice(0,3);
@@ -3186,8 +3205,7 @@ function renderReport() {
   const topTasks = Object.entries(taskTot).sort((a,b)=>b[1]-a[1]).slice(0,5);
 
   // 時間帯集計
-  const slots = {early:0, mid:0, late:0};
-  curRecs.forEach(r=>{ if(r.taskSlots) Object.values(r.taskSlots).forEach(s=>{ slots.early+=s.early||0; slots.mid+=s.mid||0; slots.late+=s.late||0; }); });
+  const slots = sumSlots(curRecs);
   const slotSum = slots.early+slots.mid+slots.late;
 
   // 緊急業務
@@ -3733,8 +3751,7 @@ async function printReport() {
     const avg = nights ? (grand/nights).toFixed(1) : 0;
     const taskTot = {};
     curRecs.forEach(r=>{ Object.entries(r.tasks||{}).forEach(([n,v])=>taskTot[n]=(taskTot[n]||0)+v); (r.freeTasks||[]).forEach(ft=>{ if(ft.name) taskTot[ft.name]=(taskTot[ft.name]||0)+(ft.count||1); }); });
-    const slots = {early:0,mid:0,late:0};
-    curRecs.forEach(r=>{ if(r.taskSlots) Object.values(r.taskSlots).forEach(s=>{ slots.early+=s.early||0; slots.mid+=s.mid||0; slots.late+=s.late||0; }); });
+    const slots = sumSlots(curRecs);
     const slotSum = slots.early+slots.mid+slots.late;
     const assistKw = ['V-A ECMO開始','V-V ECMO開始','IABP開始','Impella CP導入','Impella 5.5導入'];
     const emergKw  = ['緊急カテーテル','心筋生検','心嚢穿刺'];
@@ -4111,6 +4128,49 @@ async function restoreFromSheet() {
       btn.innerHTML = '☁️ スプレッドシートからアプリに復元';
       return;
     }
+
+    // ②方式：スプレッドシートからtaskSlotsを復元
+    // GASから slotEarly/slotMid/slotLate（時間帯合計）が返ってくる場合、
+    // それをtaskSlotsの "_total_" エントリとして格納する
+    sheetRecords.forEach(sr => {
+      if (!sr.taskSlots || Object.keys(sr.taskSlots).length === 0) {
+        // taskSlotsが空 → 時間帯合計列（slotEarly/slotMid/slotLate）から復元を試みる
+        const early = Number(sr.slotEarly || sr.slot_early || sr.準夜件数 || 0);
+        const mid   = Number(sr.slotMid   || sr.slot_mid   || sr.深夜件数 || 0);
+        const late  = Number(sr.slotLate  || sr.slot_late  || sr.早朝件数 || 0);
+        if (early + mid + late > 0) {
+          // タスク件数の合計に比例して時間帯を按分してtaskSlotsを復元
+          const tasks = sr.tasks || {};
+          const taskNames = Object.keys(tasks);
+          const taskGrand = Object.values(tasks).reduce((s, v) => s + v, 0);
+          if (taskNames.length > 0 && taskGrand > 0) {
+            sr.taskSlots = {};
+            taskNames.forEach(n => {
+              const v = tasks[n] || 0;
+              const ratio = v / taskGrand;
+              sr.taskSlots[n] = {
+                early: Math.round(early * ratio),
+                mid:   Math.round(mid   * ratio),
+                late:  Math.round(late  * ratio)
+              };
+            });
+            // 按分誤差を最大タスクで吸収
+            const topTask = taskNames.reduce((a, b) => (tasks[a] >= tasks[b] ? a : b));
+            const allocated = {
+              early: Object.values(sr.taskSlots).reduce((s, x) => s + x.early, 0),
+              mid:   Object.values(sr.taskSlots).reduce((s, x) => s + x.mid,   0),
+              late:  Object.values(sr.taskSlots).reduce((s, x) => s + x.late,  0)
+            };
+            sr.taskSlots[topTask].early += early - allocated.early;
+            sr.taskSlots[topTask].mid   += mid   - allocated.mid;
+            sr.taskSlots[topTask].late  += late  - allocated.late;
+          } else {
+            // タスク不明の場合は _slot_total_ として保存
+            sr.taskSlots = { '_slot_total_': { early, mid, late } };
+          }
+        }
+      }
+    });
 
     // ローカルとマージ（同じ日付はスプレッドシート優先）
     const local = getRecords();
