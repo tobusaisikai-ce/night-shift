@@ -1283,19 +1283,49 @@ function updatePrevCopyButton() {
 }
 
 // ===================== FREE TASKS =====================
-function addFree() { freeTasks.push({ name:'', count:1 }); renderFree(); }
+function addFree() { freeTasks.push({ name:'', count:1, slots:{early:0,mid:0,late:0} }); renderFree(); }
 function renderFree() {
   const c = document.getElementById('free-container');
   c.innerHTML = '';
   freeTasks.forEach((ft,i) => {
+    if (!ft.slots) ft.slots = {early:0,mid:0,late:0};
     const row = document.createElement('div');
     row.className = 'free-row';
+    row.style.cssText = 'flex-direction:column;gap:6px;padding:10px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;margin-bottom:6px';
     row.innerHTML = `
-      <input type="text" placeholder="業務名・対応内容" value="${ft.name}" oninput="freeTasks[${i}].name=this.value">
-      <input type="number" class="free-cnt" min="1" value="${ft.count}" oninput="freeTasks[${i}].count=parseInt(this.value)||1">
-      <button class="rm-btn" onclick="freeTasks.splice(${i},1);renderFree()">×</button>`;
+      <div style="display:flex;gap:6px;align-items:center">
+        <input type="text" placeholder="業務名・対応内容" value="${ft.name}" oninput="freeTasks[${i}].name=this.value" style="flex:1">
+        <input type="number" class="free-cnt" min="1" value="${ft.count}" oninput="freeTasks[${i}].count=parseInt(this.value)||1" style="width:56px">
+        <button class="rm-btn" onclick="freeTasks.splice(${i},1);renderFree()">×</button>
+      </div>
+      <div style="display:flex;gap:6px">
+        <div style="font-size:10px;color:var(--text-dim);align-self:center;width:48px">時間帯</div>
+        <div style="display:flex;gap:4px;flex:1">
+          ${['early','mid','late'].map((s,si)=>{
+            const labels=['準夜','深夜','早朝'];
+            const val = ft.slots[s]||0;
+            return `<div style="flex:1;text-align:center">
+              <div style="font-size:9px;color:var(--text-dim);margin-bottom:3px">${labels[si]}</div>
+              <div style="display:flex;align-items:center;justify-content:center;gap:3px">
+                <button onclick="freeSlotChange(${i},'${s}',-1)" style="width:22px;height:22px;border:1px solid var(--border);border-radius:4px;background:var(--surface);font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:center">−</button>
+                <span style="font-size:12px;font-weight:700;min-width:16px;text-align:center">${val}</span>
+                <button onclick="freeSlotChange(${i},'${s}',1)" style="width:22px;height:22px;border:1px solid var(--border);border-radius:4px;background:var(--surface);font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:center">＋</button>
+              </div>
+            </div>`;
+          }).join('')}
+        </div>
+      </div>`;
     c.appendChild(row);
   });
+}
+
+function freeSlotChange(i, slot, delta) {
+  if (!freeTasks[i].slots) freeTasks[i].slots = {early:0,mid:0,late:0};
+  freeTasks[i].slots[slot] = Math.max(0, (freeTasks[i].slots[slot]||0) + delta);
+  // 合計件数も自動更新
+  const total = Object.values(freeTasks[i].slots).reduce((s,v)=>s+v,0);
+  if (total > 0) freeTasks[i].count = total;
+  renderFree();
 }
 
 // ===================== PROGRESS =====================
@@ -1318,6 +1348,12 @@ function saveRecord() {
   const tasks = Object.fromEntries(Object.entries(taskCounts).filter(([,v])=>v>0));
   const savedSlots = {};
   Object.keys(tasks).forEach(n => { if (taskSlots[n]) savedSlots[n] = {...taskSlots[n]}; });
+  // 自由記載の時間帯もtaskSlotsに追加
+  freeTasks.filter(ft=>ft.name.trim()).forEach(ft=>{
+    if (ft.slots && Object.values(ft.slots).some(v=>v>0)) {
+      savedSlots[ft.name.trim()] = {...ft.slots};
+    }
+  });
 
   const record = {
     date, staff:[...selStaff], oncall:[...selOncall], ocCall, ocExt,
@@ -1440,7 +1476,10 @@ function loadRecord(r) {
     if (r.taskSlots && r.taskSlots[n]) taskSlots[n] = {...r.taskSlots[n]};
     else taskSlots[n] = { early:v, mid:0, late:0 };
   });
-  freeTasks=[...(r.freeTasks||[])];
+  freeTasks=[...(r.freeTasks||[])].map(ft=>({
+    ...ft,
+    slots: r.taskSlots?.[ft.name] || ft.slots || {early:0,mid:0,late:0}
+  }));
   // 値が入っているグループは自動展開
   collapsedGroups = new Set(TASK_GROUPS.filter(g=>!g.tasks.some(n=>taskCounts[n]>0)).map(g=>g.id));
   renderStaff(); renderOncall(); renderCardiacOncall();
