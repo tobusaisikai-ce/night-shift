@@ -184,6 +184,28 @@ textarea { height: 76px; resize: vertical; font-size: 13px; line-height: 1.6; }
 .slot-val { font-family: 'JetBrains Mono', monospace; font-size: 18px; font-weight: 800; min-width: 24px; text-align: center; color: var(--text-dim); }
 .slot-counter.active .slot-val { color: var(--accent); }
 
+/* ===== 呼び出し理由チップ ===== */
+.oc-reason-chips { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 2px; }
+.oc-reason-chip { font-size: 10px; font-weight: 600; padding: 4px 8px; border-radius: 20px; border: 1.5px solid var(--border); background: var(--surface2); color: var(--text-muted); cursor: pointer; transition: all 0.12s; user-select: none; }
+.oc-reason-chip.sel { background: var(--orange-dim); border-color: var(--orange); color: var(--orange); font-weight: 700; }
+.oc-reason-chip.sel-red { background: var(--red-dim); border-color: var(--red); color: var(--red); font-weight: 700; }
+.oc-reason-chip.empty { font-style: italic; color: var(--text-dim); cursor: default; border-style: dashed; }
+.oc-reason-error { font-size: 10px; color: var(--red); font-weight: 700; margin-top: 4px; padding: 3px 6px; background: var(--red-dim); border-radius: 5px; }
+
+/* ===== 拘束時間チップ ===== */
+.oc-dur-chip { flex: 1; padding: 6px 4px; border-radius: 8px; border: 1.5px solid var(--border); background: var(--surface2); color: var(--text-muted); font-family: 'Noto Sans JP', sans-serif; font-size: 11px; font-weight: 600; cursor: pointer; text-align: center; transition: all 0.15s; }
+.oc-dur-chip.sel-short { background: #f0fdf4; border-color: var(--green); color: var(--green); font-weight: 700; box-shadow: 0 0 0 2px rgba(22,163,74,0.15); }
+.oc-dur-chip.sel-mid   { background: #fffbeb; border-color: var(--yellow); color: var(--yellow); font-weight: 700; box-shadow: 0 0 0 2px rgba(217,119,6,0.15); }
+.oc-dur-chip.sel-long  { background: #fef2f2; border-color: var(--red); color: var(--red); font-weight: 700; box-shadow: 0 0 0 2px rgba(220,38,38,0.15); }
+
+/* ===== 主担当者（夜勤カード内） ===== */
+.primary-handler-row { margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--border); display: none; }
+.primary-handler-label { font-size: 10px; font-weight: 800; color: var(--text-muted); letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 6px; }
+.primary-handler-chips { display: flex; flex-wrap: wrap; gap: 5px; }
+.ph-chip { font-size: 12px; font-weight: 600; padding: 5px 12px; border-radius: 20px; border: 1.5px solid var(--border); background: var(--surface2); color: var(--text-muted); cursor: pointer; transition: all 0.15s; user-select: none; }
+.ph-chip:active { transform: scale(0.95); }
+.ph-chip.sel { background: var(--green-dim); border-color: var(--green); color: var(--green); font-weight: 700; box-shadow: 0 0 0 3px rgba(22,163,74,0.12); }
+
 /* ===== よく使う ===== */
 .fav-section { background: linear-gradient(135deg, #eff6ff, #f0fdf4); border: 1.5px solid var(--border); border-radius: var(--radius); padding: 14px; margin-bottom: 10px; }
 .fav-title { font-size: 11px; color: var(--accent); font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 10px; display: flex; align-items: center; gap: 6px; }
@@ -555,10 +577,15 @@ textarea { height: 76px; resize: vertical; font-size: 13px; line-height: 1.6; }
   <div class="card">
     <div class="card-hdr c-green">夜勤者（複数選択可）</div>
     <div class="staff-grid" id="staff-grid"></div>
+    <!-- 主担当者（2人以上選択時に表示） -->
+    <div class="primary-handler-row" id="primary-handler-row">
+      <div class="primary-handler-label">👤 主担当者（代表1名）</div>
+      <div class="primary-handler-chips" id="primary-handler-chips"></div>
+    </div>
   </div>
 
   <!-- オンコール -->
-  <div class="card">
+  <div class="card" id="oncall-card">
     <div class="card-hdr c-orange">オンコール / 心外オンコール</div>
 
     <!-- 2カラムレイアウト：左=通常オンコール、右=心外オンコール -->
@@ -576,6 +603,19 @@ textarea { height: 76px; resize: vertical; font-size: 13px; line-height: 1.6; }
             <button class="tgl-btn" id="oc-call-yes" onclick="toggleOC('call','yes')" style="font-size:12px;padding:9px">✓ あり</button>
             <button class="tgl-btn" id="oc-call-no" onclick="toggleOC('call','no')" style="font-size:12px;padding:9px">✗ なし</button>
           </div>
+          <!-- 呼び出しあり時：理由＋時間 -->
+          <div id="oc-call-detail-panel" style="display:none;margin-top:8px">
+            <div class="field-label" style="margin-bottom:5px;font-size:10px">呼び出し理由 <span style="color:var(--red)">*</span></div>
+            <div id="oc-call-reason-chips" class="oc-reason-chips"></div>
+            <div id="oc-call-reason-error" class="oc-reason-error" style="display:none">⚠ 理由を選択してください</div>
+            <div class="field-label" style="margin-bottom:5px;font-size:10px;margin-top:8px">拘束時間 <span style="color:var(--red)">*</span></div>
+            <div style="display:flex;gap:5px;">
+              <button class="oc-dur-chip" id="ocd-s" onclick="setOCDuration('call','short')">〜1h</button>
+              <button class="oc-dur-chip" id="ocd-m" onclick="setOCDuration('call','mid')">1〜3h</button>
+              <button class="oc-dur-chip" id="ocd-l" onclick="setOCDuration('call','long')">3h超</button>
+            </div>
+            <div id="oc-call-duration-error" class="oc-reason-error" style="display:none">⚠ 拘束時間を選択してください</div>
+          </div>
         </div>
 
         <div style="margin-top:10px">
@@ -584,11 +624,26 @@ textarea { height: 76px; resize: vertical; font-size: 13px; line-height: 1.6; }
             <button class="tgl-btn" id="oc-ext-yes" onclick="toggleOC('ext','yes')" style="font-size:12px;padding:9px">✓ あり</button>
             <button class="tgl-btn" id="oc-ext-no" onclick="toggleOC('ext','no')" style="font-size:12px;padding:9px">✗ なし</button>
           </div>
-          <!-- オンコール外呼び出しあり時：誰が呼ばれたか -->
-          <div class="ext-caller-panel" id="ext-caller-panel">
-            <div class="panel-label orange">📞 呼ばれたスタッフ（複数選択可）</div>
-            <div class="staff-grid" id="ext-caller-grid" style="gap:5px"></div>
+          <!-- OC外：理由＋時間＋スタッフ -->
+          <div id="oc-ext-detail-panel" style="display:none;margin-top:8px">
+            <div class="field-label" style="margin-bottom:5px;font-size:10px">呼び出し理由 <span style="color:var(--red)">*</span></div>
+            <div id="oc-ext-reason-chips" class="oc-reason-chips"></div>
+            <div id="oc-ext-reason-error" class="oc-reason-error" style="display:none">⚠ 理由を選択してください</div>
+            <div class="field-label" style="margin-bottom:5px;font-size:10px;margin-top:8px">拘束時間 <span style="color:var(--red)">*</span></div>
+            <div style="display:flex;gap:5px;">
+              <button class="oc-dur-chip" id="ocd-ext-s" onclick="setOCDuration('ext','short')">〜1h</button>
+              <button class="oc-dur-chip" id="ocd-ext-m" onclick="setOCDuration('ext','mid')">1〜3h</button>
+              <button class="oc-dur-chip" id="ocd-ext-l" onclick="setOCDuration('ext','long')">3h超</button>
+            </div>
+            <div id="oc-ext-duration-error" class="oc-reason-error" style="display:none">⚠ 拘束時間を選択してください</div>
+            <!-- 呼ばれたスタッフ -->
+            <div class="ext-caller-panel show" style="margin-top:8px">
+              <div class="panel-label orange">📞 呼ばれたスタッフ（複数選択可）</div>
+              <div class="staff-grid" id="ext-caller-grid" style="gap:5px"></div>
+            </div>
           </div>
+          <!-- 旧パネル（display:noneのダミー、renderExtCallerGrid互換用） -->
+          <div class="ext-caller-panel" id="ext-caller-panel" style="display:none"></div>
         </div>
       </div>
 
@@ -604,9 +659,20 @@ textarea { height: 76px; resize: vertical; font-size: 13px; line-height: 1.6; }
             <button class="tgl-btn" id="oc-cardiac-yes" onclick="toggleOC('cardiac','yes')" style="font-size:12px;padding:9px">✓ あり</button>
             <button class="tgl-btn" id="oc-cardiac-no" onclick="toggleOC('cardiac','no')" style="font-size:12px;padding:9px">✗ なし</button>
           </div>
+          <!-- 心外OC：理由＋時間 -->
+          <div id="oc-cardiac-detail-panel" style="display:none;margin-top:8px">
+            <div class="field-label" style="margin-bottom:5px;font-size:10px">呼び出し理由 <span style="color:var(--red)">*</span></div>
+            <div id="oc-cardiac-reason-chips" class="oc-reason-chips"></div>
+            <div id="oc-cardiac-reason-error" class="oc-reason-error" style="display:none">⚠ 理由を選択してください</div>
+            <div class="field-label" style="margin-bottom:5px;font-size:10px;margin-top:8px">拘束時間 <span style="color:var(--red)">*</span></div>
+            <div style="display:flex;gap:5px;">
+              <button class="oc-dur-chip" id="ocd-cardiac-s" onclick="setOCDuration('cardiac','short')">〜1h</button>
+              <button class="oc-dur-chip" id="ocd-cardiac-m" onclick="setOCDuration('cardiac','mid')">1〜3h</button>
+              <button class="oc-dur-chip" id="ocd-cardiac-l" onclick="setOCDuration('cardiac','long')">3h超</button>
+            </div>
+            <div id="oc-cardiac-duration-error" class="oc-reason-error" style="display:none">⚠ 拘束時間を選択してください</div>
+          </div>
         </div>
-
-
       </div>
 
     </div><!-- /.oncall-2col -->
@@ -753,6 +819,19 @@ textarea { height: 76px; resize: vertical; font-size: 13px; line-height: 1.6; }
   </div>
 
   <div class="settings-card">
+    <h3>📄 PDF出力設定</h3>
+    <div class="settings-row">
+      <div class="field-label">部署名</div>
+      <input type="text" id="pdf-dept" placeholder="例：臨床工学室 夜勤チーム" oninput="savePdfSettings()">
+    </div>
+    <div class="settings-row">
+      <div class="field-label">作成者名</div>
+      <input type="text" id="pdf-author" placeholder="例：CE夜勤業務集計システム" oninput="savePdfSettings()">
+    </div>
+    <div class="settings-help">PDFのフッターに表示されます。空欄の場合はデフォルト表記を使用します。</div>
+  </div>
+
+  <div class="settings-card">
     <h3>💾 データ管理</h3>
     <div class="settings-row">
       <div class="field-label">ローカル記録数</div>
@@ -886,9 +965,16 @@ let selStaff = new Set();
 let selOncall = new Set();
 let selCardiacOncall = new Set();
 let ocCall = null, ocExt = null, ocCardiac = null;
+let ocCallDuration = null;    // 'short'|'mid'|'long'|null
+let ocExtDuration = null;     // 'short'|'mid'|'long'|null
+let ocCardiacDuration = null; // 'short'|'mid'|'long'|null
+let ocCallReasons = new Set();    // 呼び出し理由（業務名）
+let ocExtReasons = new Set();
+let ocCardiacReasons = new Set();
 let selExtCallers = new Set();       // オンコール外呼び出し：呼ばれたスタッフ
 let taskCounts = {}; // taskName -> total count
 let taskSlots = {};  // taskName -> {early, mid, late} 時間帯別
+let primaryHandler = ''; // 主担当者（1名）
 let freeTasks = [];
 let hMonth = new Date();
 let sMonth = new Date();
@@ -980,9 +1066,37 @@ function renderStaff() {
     } else {
       el.className = 's-chip';
       el.style.cssText = '';
+      // 選択解除された人が主担当だったらリセット
+      if (primaryHandler === n) primaryHandler = '';
     }
+    renderPrimaryHandler();
     updateProg();
   }, '');
+}
+
+function renderPrimaryHandler() {
+  const row = document.getElementById('primary-handler-row');
+  const chips = document.getElementById('primary-handler-chips');
+  if (!row || !chips) return;
+  const staff = [...selStaff];
+  // 1人以下なら非表示（1人夜勤は主担当不要）
+  if (staff.length < 2) {
+    row.style.display = 'none';
+    primaryHandler = '';
+    return;
+  }
+  row.style.display = 'block';
+  chips.innerHTML = '';
+  staff.forEach(name => {
+    const chip = document.createElement('span');
+    chip.className = 'ph-chip' + (primaryHandler === name ? ' sel' : '');
+    chip.textContent = name;
+    chip.onclick = () => {
+      primaryHandler = (primaryHandler === name) ? '' : name; // トグル
+      renderPrimaryHandler();
+    };
+    chips.appendChild(chip);
+  });
 }
 
 function renderOncall() {
@@ -1065,25 +1179,87 @@ function toggleOC(type, val) {
     ocCall = val;
     document.getElementById('oc-call-yes').className = 'tgl-btn' + (val==='yes'?' tgl-yes':'');
     document.getElementById('oc-call-no').className = 'tgl-btn' + (val==='no'?' tgl-no':'');
+    const dp = document.getElementById('oc-call-detail-panel');
+    if (dp) dp.style.display = (val==='yes') ? 'block' : 'none';
+    if (val==='no') { ocCallDuration=null; ocCallReasons.clear(); updateDurationChips('call'); renderReasonChips('call'); }
+    else if (val==='yes') renderReasonChips('call');
   } else if (type === 'ext') {
     ocExt = val;
     document.getElementById('oc-ext-yes').className = 'tgl-btn' + (val==='yes'?' tgl-yes':'');
     document.getElementById('oc-ext-no').className = 'tgl-btn' + (val==='no'?' tgl-no':'');
-    // あり→パネル展開、なし→パネル閉じて選択リセット
-    const panel = document.getElementById('ext-caller-panel');
-    if (val === 'yes') {
-      panel.classList.add('show');
-    } else {
-      panel.classList.remove('show');
-      selExtCallers.clear();
-      renderExtCallerGrid();
-    }
+    const dpExt = document.getElementById('oc-ext-detail-panel');
+    if (dpExt) dpExt.style.display = (val==='yes') ? 'block' : 'none';
+    if (val==='no') { ocExtDuration=null; ocExtReasons.clear(); updateDurationChips('ext'); renderReasonChips('ext'); selExtCallers.clear(); renderExtCallerGrid(); }
+    else if (val==='yes') { renderReasonChips('ext'); renderExtCallerGrid(); }
   } else if (type === 'cardiac') {
     ocCardiac = val;
     document.getElementById('oc-cardiac-yes').className = 'tgl-btn' + (val==='yes'?' tgl-yes':'');
     document.getElementById('oc-cardiac-no').className = 'tgl-btn' + (val==='no'?' tgl-no':'');
+    const dpCard = document.getElementById('oc-cardiac-detail-panel');
+    if (dpCard) dpCard.style.display = (val==='yes') ? 'block' : 'none';
+    if (val==='no') { ocCardiacDuration=null; ocCardiacReasons.clear(); updateDurationChips('cardiac'); renderReasonChips('cardiac'); }
+    else if (val==='yes') renderReasonChips('cardiac');
   }
   updateProg();
+}
+
+// 呼び出し理由チップ描画（入力済み業務から生成）
+function renderReasonChips(type) {
+  const containerId = `oc-${type}-reason-chips`;
+  const c = document.getElementById(containerId);
+  if (!c) return;
+  const reasons = type==='call' ? ocCallReasons : type==='ext' ? ocExtReasons : ocCardiacReasons;
+  const selClass = type==='cardiac' ? 'sel-red' : 'sel';
+
+  // 入力済み業務を取得（件数1以上）
+  const activeTasks = Object.entries(taskCounts).filter(([,v])=>v>0).map(([n])=>n);
+  if (!activeTasks.length) {
+    c.innerHTML = `<span class="oc-reason-chip empty">業務集計を先に入力してください</span>`;
+    return;
+  }
+  c.innerHTML = '';
+  activeTasks.forEach(name => {
+    const chip = document.createElement('span');
+    chip.className = 'oc-reason-chip' + (reasons.has(name) ? ` ${selClass}` : '');
+    // 長い業務名は短縮表示
+    chip.textContent = name.length > 14 ? name.slice(0,13)+'…' : name;
+    chip.title = name;
+    chip.onclick = () => {
+      reasons.has(name) ? reasons.delete(name) : reasons.add(name);
+      renderReasonChips(type);
+      // エラー表示を消す
+      const errEl = document.getElementById(`oc-${type}-reason-error`);
+      if (errEl && reasons.size > 0) errEl.style.display = 'none';
+    };
+    c.appendChild(chip);
+  });
+}
+
+// 拘束時間チップの選択・更新
+function setOCDuration(type, dur) {
+  if (type === 'call') {
+    ocCallDuration = (ocCallDuration === dur) ? null : dur;
+    updateDurationChips('call');
+  } else if (type === 'ext') {
+    ocExtDuration = (ocExtDuration === dur) ? null : dur;
+    updateDurationChips('ext');
+  } else if (type === 'cardiac') {
+    ocCardiacDuration = (ocCardiacDuration === dur) ? null : dur;
+    updateDurationChips('cardiac');
+  }
+}
+function updateDurationChips(type) {
+  const dur = type === 'call' ? ocCallDuration : type === 'ext' ? ocExtDuration : ocCardiacDuration;
+  const prefix = type === 'call' ? 'ocd' : type === 'ext' ? 'ocd-ext' : 'ocd-cardiac';
+  ['s','m','l'].forEach(k => {
+    const el = document.getElementById(`${prefix}-${k}`);
+    if (!el) return;
+    el.className = 'oc-dur-chip' + (
+      (k==='s'&&dur==='short') ? ' sel-short' :
+      (k==='m'&&dur==='mid')   ? ' sel-mid' :
+      (k==='l'&&dur==='long')  ? ' sel-long' : ''
+    );
+  });
 }
 
 // ===================== TASKS =====================
@@ -1202,8 +1378,13 @@ function chgSlot(btn) {
   taskSlots[name][slotKey] = nxt;
   // 合計を自動再計算
   taskCounts[name] = (taskSlots[name].early||0) + (taskSlots[name].mid||0) + (taskSlots[name].late||0);
+  // 件数が0になったら理由から除外
+  if (taskCounts[name] === 0) {
+    ocCallReasons.delete(name); ocExtReasons.delete(name); ocCardiacReasons.delete(name);
+  }
   renderTasks();
   renderFavTasks();
+  ['call','ext','cardiac'].forEach(t => { if (document.getElementById(`oc-${t}-detail-panel`)?.style.display==='block') renderReasonChips(t); });
   updateProg();
 }
 
@@ -1332,6 +1513,7 @@ function copyPrevious() {
 
   taskCounts = { ...(prev.tasks||{}) };
   taskSlots = {};
+  primaryHandler = prev.primaryHandler || '';
   // 時間帯情報があれば復元、なければ「前半」にまとめる
   Object.entries(prev.tasks||{}).forEach(([n,v])=>{
     if (prev.taskSlots && prev.taskSlots[n]) taskSlots[n] = {...prev.taskSlots[n]};
@@ -1347,6 +1529,7 @@ function copyPrevious() {
   ocCardiac = prev.ocCardiac||null;
 
   renderStaff();
+  renderPrimaryHandler();
   renderOncall();
   renderTasks();
   renderFavTasks();
@@ -1442,16 +1625,24 @@ function saveRecord() {
   });
 
   const record = {
-    date, staff:[...selStaff], oncall:[...selOncall], ocCall, ocExt,
+    date, staff:[...selStaff],
+    primaryHandler: selStaff.size >= 2 ? (primaryHandler||'') : '',
+    oncall:[...selOncall], ocCall, ocExt,
     extCallers: ocExt==='yes' ? [...selExtCallers] : [],
     ocCardiac,
     cardiacOncall:[...selCardiacOncall],
+    ocCallDuration: ocCall==='yes' ? (ocCallDuration||null) : null,
+    ocCallReasons: ocCall==='yes' ? [...ocCallReasons] : [],
+    ocExtDuration: ocExt==='yes' ? (ocExtDuration||null) : null,
+    ocExtReasons: ocExt==='yes' ? [...ocExtReasons] : [],
+    ocCardiacDuration: ocCardiac==='yes' ? (ocCardiacDuration||null) : null,
+    ocCardiacReasons: ocCardiac==='yes' ? [...ocCardiacReasons] : [],
     tasks,
     taskSlots: savedSlots,
     freeTasks: freeTasks.filter(ft=>ft.name.trim()),
     memo: document.getElementById('shift-memo').value.trim(),
     savedAt: new Date().toISOString(),
-    syncStatus: 'pending' // 初期状態は未送信
+    syncStatus: 'pending'
   };
   const recs = getRecords();
   const idx = recs.findIndex(r=>r.date===date);
@@ -1479,11 +1670,20 @@ function resetForm(fromDate) {
   selStaff.clear(); selOncall.clear(); selCardiacOncall.clear();
   selExtCallers.clear();
   ocCall=null; ocExt=null; ocCardiac=null;
-  taskCounts={}; taskSlots={}; freeTasks=[];
+  ocCallDuration=null; ocExtDuration=null; ocCardiacDuration=null;
+  ocCallReasons.clear(); ocExtReasons.clear(); ocCardiacReasons.clear();
+  updateDurationChips('call'); updateDurationChips('ext'); updateDurationChips('cardiac');
+  const dpCall=document.getElementById('oc-call-detail-panel');
+  const dpExt=document.getElementById('oc-ext-detail-panel');
+  const dpCard=document.getElementById('oc-cardiac-detail-panel');
+  if(dpCall) dpCall.style.display='none';
+  if(dpExt)  dpExt.style.display='none';
+  if(dpCard) dpCard.style.display='none';
+  taskCounts={}; taskSlots={}; primaryHandler=''; freeTasks=[];
   collapsedGroups = new Set(TASK_GROUPS.map(g=>g.id)); // デフォルトで全部折りたたみ
   searchQuery = '';
   if (document.getElementById('task-search')) document.getElementById('task-search').value='';
-  renderStaff(); renderOncall(); renderCardiacOncall(); renderExtCallerGrid(); renderFavTasks(); renderTasks(); renderFree();
+  renderStaff(); renderPrimaryHandler(); renderOncall(); renderCardiacOncall(); renderExtCallerGrid(); renderFavTasks(); renderTasks(); renderFree();
   ['oc-call-yes','oc-call-no','oc-ext-yes','oc-ext-no','oc-cardiac-yes','oc-cardiac-no'].forEach(id=>document.getElementById(id).className='tgl-btn');
   document.getElementById('ext-caller-panel').classList.remove('show');
   updateProg();
@@ -2411,18 +2611,24 @@ function renderInsights() {
 
   const staffRanking = {};
   curRecs.forEach(r=>{
+    const rTotal = Object.values(r.tasks||{}).reduce((s,v)=>s+v,0)+(r.freeTasks||[]).reduce((s,ft)=>s+(ft.count||1),0);
     (r.staff||[]).forEach(s=>{
-      if (!staffRanking[s]) staffRanking[s] = { nights:0, total:0, tasks:{} };
+      if (!staffRanking[s]) staffRanking[s] = { nights:0, total:0, primaryNights:0, tasks:{} };
       staffRanking[s].nights++;
       Object.entries(r.tasks||{}).forEach(([n,v])=>{ staffRanking[s].total+=v; staffRanking[s].tasks[n]=(staffRanking[s].tasks[n]||0)+v; });
       (r.freeTasks||[]).forEach(ft=>{ staffRanking[s].total+=(ft.count||1); });
     });
+    // 主担当者カウント
+    if (r.primaryHandler && staffRanking[r.primaryHandler]) {
+      staffRanking[r.primaryHandler].primaryNights++;
+    }
   });
   const staffSorted = Object.entries(staffRanking).map(([name,d])=>({
-    name, nights:d.nights, total:d.total,
+    name, nights:d.nights, total:d.total, primaryNights:d.primaryNights||0,
     avg: d.nights ? (d.total/d.nights).toFixed(1) : 0,
     topTask: Object.entries(d.tasks).sort((a,b)=>b[1]-a[1])[0]?.[0] || '—'
   })).sort((a,b)=>b.total-a.total);
+  const hasPrimaryData = Object.values(staffRanking).some(d=>(d.primaryNights||0)>0);
 
   const maxDailyTotal = dailySorted.length ? dailySorted[0].total : 1;
   const maxStaffTotal = staffSorted.length ? staffSorted[0].total : 1;
@@ -2473,6 +2679,7 @@ function renderInsights() {
 
       <!-- 人別 -->
       <div id="rank-staff-panel" style="display:none">
+        ${hasPrimaryData ? `<div style="font-size:10px;color:var(--text-muted);margin-bottom:8px;padding:6px 10px;background:var(--green-dim);border-radius:7px;border-left:3px solid var(--green)">🟢 主担当として記録された夜勤回数を表示しています</div>` : `<div style="font-size:10px;color:var(--text-muted);margin-bottom:8px;padding:6px 10px;background:var(--surface2);border-radius:7px">夜勤者の「主担当者」を選択すると、個人別の主担当回数が表示されます。</div>`}
         ${staffSorted.map((d,i)=>{
           const pct = Math.round(d.total/maxStaffTotal*100);
           const staffRecs = curRecs.filter(r=>(r.staff||[]).includes(d.name));
@@ -2495,7 +2702,10 @@ function renderInsights() {
                   <div style="height:100%;width:${pct}%;background:${i===0?'#f59e0b':i===1?'#94a3b8':i===2?'#cd7c4a':'var(--accent)'};border-radius:4px"></div>
                 </div>
               </div>
-              <div style="font-size:14px;font-weight:800;color:var(--text);flex-shrink:0;width:38px;text-align:right">${d.total}<span style="font-size:9px;font-weight:400;color:var(--text-dim)">件</span></div>
+              <div style="flex-shrink:0;width:52px;text-align:right">
+                <div style="font-size:13px;font-weight:800;color:var(--text)">${d.total}<span style="font-size:9px;font-weight:400;color:var(--text-dim)">件</span></div>
+                ${d.primaryNights > 0 ? `<div style="font-size:10px;font-weight:700;color:var(--green)">主担当${d.primaryNights}回</div>` : ''}
+              </div>
               <span style="font-size:10px;color:var(--text-dim)">▼</span>
             </div>
             <div id="rank-detail-staff-${i}" style="display:none;background:var(--surface2);border-radius:8px;padding:10px 12px;margin-top:4px;border-left:3px solid var(--purple)">
@@ -2505,7 +2715,7 @@ function renderInsights() {
                   <span style="flex:1;padding-right:8px;color:var(--text)">${n}</span>
                   <span style="font-weight:700;color:var(--purple);background:#f5f3ff;padding:1px 7px;border-radius:4px">${v}件</span>
                 </div>`).join('')}
-              <div style="font-size:10px;color:var(--text-dim);margin-top:6px">夜勤回数：${d.nights}回 / 総件数：${d.total}件 / 平均：${d.avg}件/夜勤</div>
+              <div style="font-size:10px;color:var(--text-dim);margin-top:6px">夜勤回数：${d.nights}回 / 総件数：${d.total}件 / 主担当：${d.primaryNights}回 / 平均：${d.avg}件/夜勤</div>
             </div>
           </div>`;
         }).join('')}
@@ -2578,7 +2788,7 @@ function showTab(tab) {
   if(tab==='history') renderHistory();
   if(tab==='stats') { renderStats(); if(currentStatsView==='insight') renderInsights(); if(currentStatsView==='report') renderReport(); }
   if(tab==='annual') renderAnnual();
-  if(tab==='settings') updateSyncStatus();
+  if(tab==='settings') { updateSyncStatus(); loadPdfSettings(); }
 }
 
 function changeMonth(which, d) {
@@ -2603,11 +2813,46 @@ function checkAndSave() {
   checks.push({ ok: ocExt !== null, label: 'オンコール外呼び出しの有無' });
   checks.push({ ok: Object.values(taskCounts).some(v=>v>0) || freeTasks.some(ft=>ft.name.trim()), label: '業務内容（1件以上）' });
 
+  // 呼び出しありのとき：理由・時間のバリデーション
+  let needScrollToOncall = false;
+  if (ocCall === 'yes') {
+    const reasonOk = ocCallReasons.size > 0;
+    const durOk = !!ocCallDuration;
+    checks.push({ ok: reasonOk, label: 'OC呼び出し理由' });
+    checks.push({ ok: durOk, label: 'OC呼び出し拘束時間' });
+    const re = document.getElementById('oc-call-reason-error');
+    const de = document.getElementById('oc-call-duration-error');
+    if (re) re.style.display = reasonOk ? 'none' : 'block';
+    if (de) de.style.display = durOk ? 'none' : 'block';
+    if (!reasonOk || !durOk) needScrollToOncall = true;
+  }
+  if (ocExt === 'yes') {
+    const reasonOk = ocExtReasons.size > 0;
+    const durOk = !!ocExtDuration;
+    checks.push({ ok: reasonOk, label: 'OC外呼び出し理由' });
+    checks.push({ ok: durOk, label: 'OC外呼び出し拘束時間' });
+    const re = document.getElementById('oc-ext-reason-error');
+    const de = document.getElementById('oc-ext-duration-error');
+    if (re) re.style.display = reasonOk ? 'none' : 'block';
+    if (de) de.style.display = durOk ? 'none' : 'block';
+    if (!reasonOk || !durOk) needScrollToOncall = true;
+  }
+  if (ocCardiac === 'yes') {
+    const reasonOk = ocCardiacReasons.size > 0;
+    const durOk = !!ocCardiacDuration;
+    checks.push({ ok: reasonOk, label: '心外OC呼び出し理由' });
+    checks.push({ ok: durOk, label: '心外OC呼び出し拘束時間' });
+    const re = document.getElementById('oc-cardiac-reason-error');
+    const de = document.getElementById('oc-cardiac-duration-error');
+    if (re) re.style.display = reasonOk ? 'none' : 'block';
+    if (de) de.style.display = durOk ? 'none' : 'block';
+    if (!reasonOk || !durOk) needScrollToOncall = true;
+  }
+
   const ng = checks.filter(c => !c.ok);
   const container = document.getElementById('save-check-list');
 
   if (ng.length > 0) {
-    // 未入力項目を表示してスクロール
     container.innerHTML = `
       <div class="check-list">
         ${checks.map(c=>`
@@ -2616,12 +2861,23 @@ function checkAndSave() {
             <span>${c.label}</span>
           </div>`).join('')}
       </div>`;
-    container.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    // 呼び出し理由/時間の未入力はオンコールカードまでスクロール
+    if (needScrollToOncall) {
+      document.getElementById('oncall-card')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    } else {
+      container.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
     showToast(`⚠ ${ng.length}項目が未入力です`, '#ff9944');
     return;
   }
 
-  // 全部OK → チェックリスト消してそのまま保存
+  // エラー表示を全クリア
+  ['call','ext','cardiac'].forEach(t => {
+    const re = document.getElementById(`oc-${t}-reason-error`);
+    const de = document.getElementById(`oc-${t}-duration-error`);
+    if (re) re.style.display = 'none';
+    if (de) de.style.display = 'none';
+  });
   container.innerHTML = '';
   saveRecord();
 }
@@ -3208,6 +3464,39 @@ function renderAnnualReport() {
   const extCallerMap={};
   yearRecs.forEach(r=>{ if(r.ocExt==='yes')(r.extCallers||[]).forEach(s=>{ extCallerMap[s]=(extCallerMap[s]||0)+1; }); });
   const cardiacReport=CARDIAC_ONCALL_STAFF.map(n=>({name:n,oncall:yearRecs.filter(r=>(r.cardiacOncall||[]).includes(n)).length,called:yearRecs.filter(r=>(r.cardiacOncall||[]).includes(n)&&r.ocCardiac==='yes').length})).filter(d=>d.oncall>0);
+  // 拘束時間内訳（年次）
+  const annCallDur={short:0,mid:0,long:0}, annExtDur={short:0,mid:0,long:0}, annCardiacDur={short:0,mid:0,long:0};
+  yearRecs.forEach(r=>{
+    if(r.ocCall==='yes'    && r.ocCallDuration)    annCallDur[r.ocCallDuration]    = (annCallDur[r.ocCallDuration]||0)+1;
+    if(r.ocExt==='yes'     && r.ocExtDuration)     annExtDur[r.ocExtDuration]      = (annExtDur[r.ocExtDuration]||0)+1;
+    if(r.ocCardiac==='yes' && r.ocCardiacDuration) annCardiacDur[r.ocCardiacDuration] = (annCardiacDur[r.ocCardiacDuration]||0)+1;
+  });
+  const annDurLabel={short:'〜1h',mid:'1〜3h',long:'3h超'};
+  const annFmtDur=(cnt)=>{ const p=Object.entries(cnt).filter(([,v])=>v>0).map(([k,v])=>`${annDurLabel[k]}:${v}回`); return p.length?`（${p.join('・')}）`:''; };
+  const hasAnnDur=Object.values(annCallDur).some(v=>v>0)||Object.values(annExtDur).some(v=>v>0)||Object.values(annCardiacDur).some(v=>v>0);
+
+  // 年次：呼び出し理由集計
+  const buildAnnReasonSummary = (recs, ocKey, reasonKey, durKey) => {
+    const reasonMap = {};
+    recs.forEach(r => {
+      if (r[ocKey] !== 'yes') return;
+      (r[reasonKey]||[]).forEach(name => {
+        if (!reasonMap[name]) reasonMap[name] = { total:0, short:0, mid:0, long:0 };
+        reasonMap[name].total++;
+        const dur = r[durKey];
+        if (dur) reasonMap[name][dur]++;
+      });
+    });
+    return Object.entries(reasonMap).sort((a,b)=>b[1].total-a[1].total).map(([name,d]) => {
+      const dp = Object.entries(annDurLabel).filter(([k])=>d[k]>0).map(([k])=>`${annDurLabel[k]}:${d[k]}回`);
+      const short = name.length>20?name.slice(0,19)+'…':name;
+      return `    ${short}：${d.total}回${dp.length?`（${dp.join('・')}）`:''}`;
+    }).join('\n');
+  };
+  const annCallReason    = buildAnnReasonSummary(yearRecs,'ocCall',   'ocCallReasons',   'ocCallDuration');
+  const annExtReason     = buildAnnReasonSummary(yearRecs,'ocExt',    'ocExtReasons',    'ocExtDuration');
+  const annCardiacReason = buildAnnReasonSummary(yearRecs,'ocCardiac','ocCardiacReasons','ocCardiacDuration');
+  const hasAnnReason = annCallReason||annExtReason||annCardiacReason;
   const months=[4,5,6,7,8,9,10,11,12,1,2,3].map(m=>{ const y=m>=4?annualYear:annualYear+1; return String(y)+'-'+String(m).padStart(2,'0'); });
   const monthLabels=months.map(m=>m.slice(5)+'月');
   const monthGrands=months.map(m=>yearRecs.filter(r=>r.date.startsWith(m)).reduce((s,r)=>s+Object.values(r.tasks||{}).reduce((a,v)=>a+v,0)+(r.freeTasks||[]).reduce((a,ft)=>a+(ft.count||1),0),0));
@@ -3240,19 +3529,43 @@ ${slotSum>0?`・準夜（16:30〜22:00）：${slots.early}件（${Math.round(slo
 ${buildSpecialReport(taskTot, nights, 'annual')}
 
 ■ オンコール状況（年間）
-・オンコール担当呼び出し：${ocCallCnt}回（呼び出し率 ${nights?Math.round(ocCallCnt/nights*100):0}%）
-・オンコール外呼び出し：${ocExtCnt}回
+・オンコール担当呼び出し：${ocCallCnt}回（呼び出し率 ${nights?Math.round(ocCallCnt/nights*100):0}%）${annFmtDur(annCallDur)}
+${(()=>{
+  const cnt={};
+  yearRecs.filter(r=>r.ocCall==='yes').forEach(r=>(r.oncall||[]).filter(n=>n&&n!=='なし').forEach(n=>{ cnt[n]=(cnt[n]||0)+1; }));
+  const s=Object.entries(cnt).sort((a,b)=>b[1]-a[1]).map(([n,v])=>`${n}：${v}回`).join('・');
+  return s?`  【呼び出されたスタッフ】${s}`:'';
+})()}
+${annCallReason?`  【呼び出し理由】\n${annCallReason}`:''}
+・オンコール外呼び出し：${ocExtCnt}回${annFmtDur(annExtDur)}
+${annExtReason?`  【呼び出し理由】\n${annExtReason}`:''}
 ${Object.entries(extCallerMap).length?`  【呼び出されたスタッフ】\n${Object.entries(extCallerMap).sort((a,b)=>b[1]-a[1]).map(([n,v])=>`    ${n}：${v}回`).join('\n')}`:'  （外呼び出しなし）'}
-・心外オンコール呼び出し：${ocCardiacCnt}回
+・心外オンコール呼び出し：${ocCardiacCnt}回${annFmtDur(annCardiacDur)}
+${(()=>{
+  const cnt={};
+  yearRecs.filter(r=>r.ocCardiac==='yes').forEach(r=>(r.cardiacOncall||[]).forEach(n=>{ cnt[n]=(cnt[n]||0)+1; }));
+  const s=Object.entries(cnt).sort((a,b)=>b[1]-a[1]).map(([n,v])=>`${n}：${v}回`).join('・');
+  return s?`  【呼び出されたスタッフ】${s}`:'';
+})()}
+${annCardiacReason?`  【呼び出し理由】\n${annCardiacReason}`:''}
+${!hasAnnReason&&!hasAnnDur?'※ 呼び出し理由・拘束時間は未記録':''}
 
 ■ 心外オンコール 担当者別集計（年間）
 ${cardiacReport.length?cardiacReport.map(d=>`・${d.name}：担当${d.oncall}回 / 呼び出し${d.called}回（呼び出し率${d.oncall?Math.round(d.called/d.oncall*100):0}%）`).join('\n'):'・データなし'}
 
 ■ 所見・課題
-${assistCnt/nights>=0.5?`・補助循環導入率が${Math.round(assistCnt/nights*100)}%と高水準。年間を通じた夜間体制の強化・増員を要する。`:''}
-${emergCnt>nights?'・緊急カテーテル対応が1夜勤あたり1件超。夜間の即応体制・人員確保の強化が必要。':''}
-${ocExtCnt>0?`・年間${ocExtCnt}回のオンコール外呼び出しが発生。即応体制の整備が必要。`:''}
-${slots.mid>slots.early&&slots.mid>slots.late?'・深夜帯への業務集中が顕著。仮眠確保・夜間応援体制の整備が望まれる。':''}
+${(()=>{
+  const issues=[], urgent=[];
+  if(assistCnt/nights>=0.5){issues.push(`・補助循環導入率${Math.round(assistCnt/nights*100)}%と高水準`);urgent.push('夜間体制強化・増員');}
+  if(emergCnt>nights){issues.push('・緊急カテーテル対応が1夜勤あたり1件超');urgent.push('夜間即応体制拡充');}
+  if(ocExtCnt>0){issues.push(`・年間${ocExtCnt}回のOC外呼び出し発生`);urgent.push('即応体制整備');}
+  if(slots.mid>slots.early&&slots.mid>slots.late){issues.push('・深夜帯への業務集中が顕著');urgent.push('深夜帯応援体制');}
+  const hasU=urgent.length>0;
+  const summary=hasU?`年間を通じて${issues.length}件の課題が確認された。特に${urgent.slice(0,2).join('・')}について対応が求められる。`:`年間を通じて夜勤業務は概ね安定して推移した。引き続きデータの蓄積を継続する。`;
+  const items=issues.length?issues.join('\n'):'・特記すべき課題事項なし';
+  const conclusion=hasU?`【結論】上記の課題について、夜勤体制の見直し・人員配置の検討を年次上申として提出する。`:`【結論】現状の夜勤体制は適切に機能している。次年度も引き続きデータを集積し、比較分析に活用する。`;
+  return `${summary}\n\n${items}\n\n${conclusion}`;
+})()}
 
 ━━━━━━━━━━━━━━━━━━━━━━━
 作成日：${new Date().toLocaleDateString('ja-JP')}
@@ -3731,6 +4044,46 @@ function renderReport() {
     return { name:n, oncallCount, calledCount };
   }).filter(d=>d.oncallCount>0);
 
+  // 拘束時間内訳集計
+  const durLabel = { short:'〜1h', mid:'1〜3h', long:'3h超' };
+  const callDurCnt = { short:0, mid:0, long:0 };
+  const extDurCnt  = { short:0, mid:0, long:0 };
+  const cardiacDurCnt = { short:0, mid:0, long:0 };
+  curRecs.forEach(r=>{
+    if (r.ocCall==='yes' && r.ocCallDuration) callDurCnt[r.ocCallDuration] = (callDurCnt[r.ocCallDuration]||0)+1;
+    if (r.ocExt==='yes'  && r.ocExtDuration)  extDurCnt[r.ocExtDuration]  = (extDurCnt[r.ocExtDuration]||0)+1;
+    if (r.ocCardiac==='yes' && r.ocCardiacDuration) cardiacDurCnt[r.ocCardiacDuration] = (cardiacDurCnt[r.ocCardiacDuration]||0)+1;
+  });
+  const hasDurData = Object.values(callDurCnt).some(v=>v>0) || Object.values(extDurCnt).some(v=>v>0) || Object.values(cardiacDurCnt).some(v=>v>0);
+  const fmtDur = (cnt) => {
+    const parts = Object.entries(cnt).filter(([,v])=>v>0).map(([k,v])=>`${durLabel[k]}:${v}回`);
+    return parts.length ? `（${parts.join('・')}）` : '';
+  };
+
+  // 呼び出し理由集計（業務名→{回数, 時間別}）
+  const buildReasonSummary = (recs, ocKey, reasonKey, durKey) => {
+    const reasonMap = {}; // 業務名 → {total, short, mid, long}
+    recs.forEach(r => {
+      if (r[ocKey] !== 'yes') return;
+      const reasons = r[reasonKey] || [];
+      const dur = r[durKey] || null;
+      reasons.forEach(name => {
+        if (!reasonMap[name]) reasonMap[name] = { total:0, short:0, mid:0, long:0 };
+        reasonMap[name].total++;
+        if (dur) reasonMap[name][dur]++;
+      });
+    });
+    return Object.entries(reasonMap).sort((a,b)=>b[1].total-a[1].total).map(([name, d]) => {
+      const durParts = Object.entries(durLabel).filter(([k])=>d[k]>0).map(([k])=>`${durLabel[k]}:${d[k]}回`);
+      const short = name.length > 20 ? name.slice(0,19)+'…' : name;
+      return `    ${short}：${d.total}回${durParts.length ? `（${durParts.join('・')}）` : ''}`;
+    }).join('\n');
+  };
+  const callReasonSummary    = buildReasonSummary(curRecs, 'ocCall',    'ocCallReasons',    'ocCallDuration');
+  const extReasonSummary     = buildReasonSummary(curRecs, 'ocExt',     'ocExtReasons',     'ocExtDuration');
+  const cardiacReasonSummary = buildReasonSummary(curRecs, 'ocCardiac', 'ocCardiacReasons', 'ocCardiacDuration');
+  const hasReasonData = callReasonSummary || extReasonSummary || cardiacReasonSummary;
+
   // 資料テキスト生成
   // グラフ用：過去12ヶ月の月別データ
   const allMonths = [...new Set(allRecs.map(r=>r.date.slice(0,7)))].sort().slice(-12);
@@ -3766,10 +4119,26 @@ ${slotSum > 0 ? `・準夜（16:30〜22:00）：${slots.early}件（${Math.round
 ${buildSpecialReport(taskTot, curRecs.length, 'month')}
 
 ■ オンコール状況
-・オンコール担当呼び出し：${ocCall}回（呼び出し率 ${ocRate}%）
-・オンコール外呼び出し：${ocExt}回
+・オンコール担当呼び出し：${ocCall}回（呼び出し率 ${ocRate}%）${fmtDur(callDurCnt)}
+${(()=>{
+  const cnt={};
+  curRecs.filter(r=>r.ocCall==='yes').forEach(r=>(r.oncall||[]).filter(n=>n&&n!=='なし').forEach(n=>{ cnt[n]=(cnt[n]||0)+1; }));
+  const s=Object.entries(cnt).sort((a,b)=>b[1]-a[1]).map(([n,v])=>`${n}：${v}回`).join('・');
+  return s?`  【呼び出されたスタッフ】${s}`:'';
+})()}
+${callReasonSummary ? `  【呼び出し理由】\n${callReasonSummary}` : ''}
+・オンコール外呼び出し：${ocExt}回${fmtDur(extDurCnt)}
+${extReasonSummary ? `  【呼び出し理由】\n${extReasonSummary}` : ''}
 ${extCallersReport ? `  【呼び出されたスタッフ】\n${extCallersReport}` : '  （外呼び出しなし）'}
-・心外オンコール呼び出し：${ocCardiacR}回
+・心外オンコール呼び出し：${ocCardiacR}回${fmtDur(cardiacDurCnt)}
+${(()=>{
+  const cnt={};
+  curRecs.filter(r=>r.ocCardiac==='yes').forEach(r=>(r.cardiacOncall||[]).forEach(n=>{ cnt[n]=(cnt[n]||0)+1; }));
+  const s=Object.entries(cnt).sort((a,b)=>b[1]-a[1]).map(([n,v])=>`${n}：${v}回`).join('・');
+  return s?`  【呼び出されたスタッフ】${s}`:'';
+})()}
+${cardiacReasonSummary ? `  【呼び出し理由】\n${cardiacReasonSummary}` : ''}
+${!hasReasonData && !hasDurData ? '※ 呼び出し理由・拘束時間は未記録' : ''}
 
 ■ 心外オンコール 担当者別集計
 ${cardiacOncallReport.length > 0
@@ -3777,12 +4146,28 @@ ${cardiacOncallReport.length > 0
   : '・この月の心外オンコールデータなし'}
 
 ■ 所見・課題
-${ocRate >= 50 ? '・オンコール呼び出し率が'+ocRate+'%と高水準。夜勤体制の見直しが必要。' : ''}
-${ocExt > 0 ? '・オンコール外呼び出しが'+ocExt+'回発生。即応体制の整備・担当者負担の実態について周知が必要。' : ''}
-${prevGrand > 0 && grand > prevGrand*1.2 ? '・前月比'+Math.round((grand-prevGrand)/prevGrand*100)+'%増と業務量が急増。継続的な増員検討を要する。' : ''}
-${assistCnt > curRecs.length ? '・補助循環導入が1夜勤あたり1件超。高度な専門技術が求められる夜間体制の強化・増員を要する。' : ''}
-${emergCnt > curRecs.length ? '・緊急カテーテル対応が1夜勤あたり1件超。夜間の即応体制・人員確保の強化が必要。' : ''}
-${slots.mid > slots.early && slots.mid > slots.late ? '・深夜帯への業務集中が顕著。仮眠確保・夜間応援体制の整備が望まれる。' : ''}
+${(() => {
+  const issues = [];
+  const urgentIssues = [];
+  // 個別所見
+  if (ocRate >= 50) { issues.push(`・OC呼び出し率が${ocRate}%と高水準（目安：30%以上で要注意）`); urgentIssues.push('夜勤体制の見直し'); }
+  else if (ocRate >= 30) { issues.push(`・OC呼び出し率が${ocRate}%とやや高め`); }
+  if (ocExt > 0) { issues.push(`・OC外呼び出しが${ocExt}回発生`); urgentIssues.push('即応体制の整備'); }
+  if (prevGrand > 0 && grand > prevGrand*1.2) { issues.push(`・前月比${Math.round((grand-prevGrand)/prevGrand*100)}%増と業務量が急増`); urgentIssues.push('増員の早期検討'); }
+  if (assistCnt > curRecs.length) { issues.push(`・補助循環導入が平均1夜勤あたり1件超（${assistCnt}件/${curRecs.length}夜勤）`); urgentIssues.push('夜間高度専門体制の強化'); }
+  if (emergCnt > curRecs.length) { issues.push(`・緊急カテーテル対応が平均1夜勤あたり1件超（${emergCnt}件/${curRecs.length}夜勤）`); urgentIssues.push('夜間即応体制の拡充'); }
+  if (slots.mid > slots.early && slots.mid > slots.late) { issues.push(`・深夜帯（22:00〜翌3:30）への業務集中が顕著（${slots.mid}件）`); urgentIssues.push('仮眠時間の確保・深夜帯応援体制'); }
+  // 3層構成テキスト生成
+  const hasUrgent = urgentIssues.length > 0;
+  const summary = hasUrgent
+    ? `今月は${issues.length}件の課題事項が確認された。特に${urgentIssues.slice(0,2).join('・')}について早急な対応が求められる。`
+    : `今月の夜勤業務は全体的に安定して推移した。引き続きデータの蓄積を継続することを推奨する。`;
+  const itemText = issues.length > 0 ? issues.join('\n') : '・特記すべき課題事項なし';
+  const conclusion = hasUrgent
+    ? `【結論】上記の課題について、夜勤体制の見直し・人員配置の検討を上申する。継続的なデータ蓄積により根拠の強化を図る。`
+    : `【結論】現状の夜勤体制は概ね適切に機能している。今後も継続してデータを集積し、比較分析に活用する。`;
+  return `${summary}\n\n${itemText}\n\n${conclusion}`;
+})()}
 
 ━━━━━━━━━━━━━━━━━━━━━━━
 作成日：${new Date().toLocaleDateString('ja-JP')}
@@ -4262,6 +4647,40 @@ async function printReport() {
     const ocRate = nights ? Math.round(ocCall/nights*100) : 0;
     const extCallerMap = {};
     curRecs.forEach(r=>{ if(r.ocExt==='yes')(r.extCallers||[]).forEach(s=>{ extCallerMap[s]=(extCallerMap[s]||0)+1; }); });
+    // 拘束時間内訳（PDF用）
+    const pdfCallDur  = { short:0, mid:0, long:0 };
+    const pdfExtDur   = { short:0, mid:0, long:0 };
+    const pdfCardiacDur = { short:0, mid:0, long:0 };
+    curRecs.forEach(r=>{
+      if (r.ocCall==='yes'    && r.ocCallDuration)    pdfCallDur[r.ocCallDuration]    = (pdfCallDur[r.ocCallDuration]||0)+1;
+      if (r.ocExt==='yes'     && r.ocExtDuration)     pdfExtDur[r.ocExtDuration]      = (pdfExtDur[r.ocExtDuration]||0)+1;
+      if (r.ocCardiac==='yes' && r.ocCardiacDuration) pdfCardiacDur[r.ocCardiacDuration] = (pdfCardiacDur[r.ocCardiacDuration]||0)+1;
+    });
+    const pdfDurLabel = { short:'〜1h', mid:'1〜3h', long:'3h超' };
+    const pdfFmtDur = (cnt) => {
+      const parts = Object.entries(cnt).filter(([,v])=>v>0).map(([k,v])=>`${pdfDurLabel[k]}:${v}回`);
+      return parts.length ? `（${parts.join(' ')}）` : '';
+    };
+    // 呼び出し理由集計（PDF用）
+    const buildPdfReason = (recs, ocKey, reasonKey, durKey) => {
+      const m = {};
+      recs.forEach(r => {
+        if (r[ocKey]!=='yes') return;
+        (r[reasonKey]||[]).forEach(name => {
+          if (!m[name]) m[name]={total:0,short:0,mid:0,long:0};
+          m[name].total++;
+          if (r[durKey]) m[name][r[durKey]]++;
+        });
+      });
+      return Object.entries(m).sort((a,b)=>b[1].total-a[1].total).map(([name,d])=>{
+        const dp=Object.entries(pdfDurLabel).filter(([k])=>d[k]>0).map(([k])=>`${pdfDurLabel[k]}:${d[k]}回`);
+        const s=name.length>18?name.slice(0,17)+'…':name;
+        return `${s}：${d.total}回${dp.length?`（${dp.join(' ')}）`:''}`;
+      });
+    };
+    const pdfCallReasons    = buildPdfReason(curRecs,'ocCall',   'ocCallReasons',   'ocCallDuration');
+    const pdfExtReasons     = buildPdfReason(curRecs,'ocExt',    'ocExtReasons',    'ocExtDuration');
+    const pdfCardiacReasons = buildPdfReason(curRecs,'ocCardiac','ocCardiacReasons','ocCardiacDuration');
     const peakDays = [...curRecs].map(r=>({ date:r.date, dow:['日','月','火','水','木','金','土'][new Date(r.date+'T00:00:00').getDay()], staff:(r.staff||[]).join('・'), total:Object.values(r.tasks||{}).reduce((s,v)=>s+v,0)+(r.freeTasks||[]).reduce((s,ft)=>s+(ft.count||1),0) })).sort((a,b)=>b.total-a.total).slice(0,5);
     const top5 = Object.entries(taskTot).sort((a,b)=>b[1]-a[1]).slice(0,5);
     const top10 = Object.entries(taskTot).sort((a,b)=>b[1]-a[1]).slice(0,10);
@@ -4285,6 +4704,17 @@ async function printReport() {
     const allMonthEmerg  = allMonths.map(m=>{ const tt={}; allRecs.filter(r=>r.date.startsWith(m)).forEach(r=>Object.entries(r.tasks||{}).forEach(([n,v])=>tt[n]=(tt[n]||0)+v)); return Object.entries(tt).filter(([n])=>emergKw.some(k=>n.includes(k))).reduce((s,[,v])=>s+v,0); });
 
     const titleStr = `夜勤業務実績報告　${fmtYMDisp(sMonth)}`;
+    const pdfSettings = getPdfSettings();
+    const footerDept   = pdfSettings.dept   || '臨床工学室';
+    const footerAuthor = pdfSettings.author || 'CE夜勤業務集計システム';
+
+    // ページフッター描画ヘルパー
+    const drawFooter = (pageNum, totalPages) => {
+      hLine(H - M + 2, '#cbd5e1', 0.4);
+      jpText(`${footerDept}　${footerAuthor}`, M, H - M + 4, 6.5, '#94a3b8');
+      jpText(`作成日：${new Date().toLocaleDateString('ja-JP')}`, M + CW/2, H - M + 4, 6.5, '#94a3b8', 'center');
+      jpText(`${pageNum} / ${totalPages}`, M + CW, H - M + 4, 6.5, '#94a3b8', 'right');
+    };
 
     // ===== 1ページ目 =====
     // タイトル
@@ -4374,9 +4804,22 @@ async function printReport() {
 
     // OC状況
     y = sectionHeader('■ オンコール状況', y); nl(2);
-    jpText(`OC担当呼び出し：${ocCall}回（呼び出し率 ${ocRate}%）`, M+2, y, 8, '#1e293b'); y += 5;
-    jpText(`OC外呼び出し：${ocExt}回${Object.keys(extCallerMap).length?'　'+Object.entries(extCallerMap).map(([n,v])=>`${n}:${v}回`).join('・'):''}`, M+2, y, 8, '#1e293b'); y += 5;
-    jpText(`心外OC呼び出し：${ocCardiacCnt}回`, M+2, y, 8, '#1e293b'); y += 5; nl(1);
+    jpText(`OC担当呼び出し：${ocCall}回（呼び出し率 ${ocRate}%）${pdfFmtDur(pdfCallDur)}`, M+2, y, 8, '#1e293b'); y += 5;
+    const pdfCallStaffCnt={};
+    curRecs.filter(r=>r.ocCall==='yes').forEach(r=>(r.oncall||[]).filter(n=>n&&n!=='なし').forEach(n=>{ pdfCallStaffCnt[n]=(pdfCallStaffCnt[n]||0)+1; }));
+    const pdfCallStaffStr=Object.entries(pdfCallStaffCnt).sort((a,b)=>b[1]-a[1]).map(([n,v])=>`${n}：${v}回`).join('・');
+    if(pdfCallStaffStr){ jpText(`  呼び出されたスタッフ：${pdfCallStaffStr}`, M+4, y, 7, '#64748b'); y += 4; }
+    pdfCallReasons.forEach(line => { jpText(`  ${line}`, M+4, y, 7, '#64748b'); y += 4; });
+    jpText(`OC外呼び出し：${ocExt}回${pdfFmtDur(pdfExtDur)}`, M+2, y, 8, '#1e293b'); y += 5;
+    if(Object.keys(extCallerMap).length){ jpText(`  呼び出されたスタッフ：${Object.entries(extCallerMap).sort((a,b)=>b[1]-a[1]).map(([n,v])=>`${n}：${v}回`).join('・')}`, M+4, y, 7, '#64748b'); y += 4; }
+    pdfExtReasons.forEach(line => { jpText(`  ${line}`, M+4, y, 7, '#64748b'); y += 4; });
+    jpText(`心外OC呼び出し：${ocCardiacCnt}回${pdfFmtDur(pdfCardiacDur)}`, M+2, y, 8, '#1e293b'); y += 5;
+    const pdfCardiacStaffCnt={};
+    curRecs.filter(r=>r.ocCardiac==='yes').forEach(r=>(r.cardiacOncall||[]).forEach(n=>{ pdfCardiacStaffCnt[n]=(pdfCardiacStaffCnt[n]||0)+1; }));
+    const pdfCardiacStaffStr=Object.entries(pdfCardiacStaffCnt).sort((a,b)=>b[1]-a[1]).map(([n,v])=>`${n}：${v}回`).join('・');
+    if(pdfCardiacStaffStr){ jpText(`  呼び出されたスタッフ：${pdfCardiacStaffStr}`, M+4, y, 7, '#64748b'); y += 4; }
+    pdfCardiacReasons.forEach(line => { jpText(`  ${line}`, M+4, y, 7, '#64748b'); y += 4; });
+    nl(1);
 
     // 心外OC担当者
     if (cardiacReport.length) {
@@ -4387,20 +4830,39 @@ async function printReport() {
       }); nl(1);
     }
 
-    // 所見
+    // 所見（3層構造）
     y = sectionHeader('■ 所見・課題', y, '#dc2626'); nl(2);
-    const issues = [
-      ocRate >= 50 ? `・OC呼び出し率が${ocRate}%と高水準。夜勤体制の見直しが必要。` : null,
-      ocExt > 0 ? `・OC外呼び出しが${ocExt}回発生。即応体制の整備が必要。` : null,
-      prevGrand>0&&grand>prevGrand*1.2 ? `・前月比${Math.round((grand-prevGrand)/prevGrand*100)}%増と業務量が急増。増員検討を要する。` : null,
-      assistCnt>nights ? `・補助循環導入が1夜勤あたり1件超。夜間体制の強化・増員を要する。` : null,
-      emergCnt>nights ? `・緊急カテ対応が1夜勤あたり1件超。夜間即応体制の整備が必要。` : null,
-      slots.mid>slots.early&&slots.mid>slots.late ? `・深夜帯への業務集中が顕著。仮眠確保・応援体制の整備が望まれる。` : null,
-    ].filter(Boolean);
-    if (issues.length === 0) { jpText('・特記事項なし', M+2, y, 8, '#64748b'); y += 5; }
-    else { issues.forEach(t => { jpText(t, M+2, y, 8, '#1e293b'); y += 5; }); }
+    const issueItems = [];
+    const urgentItems = [];
+    if (ocRate >= 50) { issueItems.push(`・OC呼び出し率が${ocRate}%と高水準（目安：30%以上で要注意）`); urgentItems.push('夜勤体制見直し'); }
+    else if (ocRate >= 30) { issueItems.push(`・OC呼び出し率が${ocRate}%とやや高め`); }
+    if (ocExt > 0) { issueItems.push(`・OC外呼び出しが${ocExt}回発生`); urgentItems.push('即応体制整備'); }
+    if (prevGrand>0&&grand>prevGrand*1.2) { issueItems.push(`・前月比${Math.round((grand-prevGrand)/prevGrand*100)}%増と業務量が急増`); urgentItems.push('増員検討'); }
+    if (assistCnt>nights) { issueItems.push(`・補助循環導入が平均1夜勤あたり1件超（${assistCnt}件/${nights}夜勤）`); urgentItems.push('高度専門体制強化'); }
+    if (emergCnt>nights) { issueItems.push(`・緊急カテ対応が平均1夜勤あたり1件超（${emergCnt}件/${nights}夜勤）`); urgentItems.push('夜間即応体制拡充'); }
+    if (slots.mid>slots.early&&slots.mid>slots.late) { issueItems.push(`・深夜帯への業務集中が顕著（${slots.mid}件）`); urgentItems.push('深夜帯応援体制'); }
+    const hasUrgent = urgentItems.length > 0;
+    const summaryStr = hasUrgent
+      ? `今月は${issueItems.length}件の課題が確認。特に${urgentItems.slice(0,2).join('・')}について早急な対応が求められる。`
+      : '今月の夜勤業務は全体的に安定して推移した。引き続きデータの蓄積を推奨する。';
+    const conclusionStr = hasUrgent
+      ? `【結論】夜勤体制の見直し・人員配置の検討を上申する。継続的なデータ蓄積により根拠を強化する。`
+      : `【結論】現状の夜勤体制は概ね適切に機能している。引き続きデータを集積し、比較分析に活用する。`;
+    // 総評
+    jpText(summaryStr.slice(0,50), M+2, y, 8, '#1e293b'); y += 5;
+    if (summaryStr.length > 50) { jpText(summaryStr.slice(50), M+2, y, 8, '#1e293b'); y += 5; }
+    nl(1);
+    // 箇条書き
+    if (issueItems.length === 0) { jpText('・特記すべき課題事項なし', M+2, y, 8, '#64748b'); y += 5; }
+    else { issueItems.forEach(t => { jpText(t, M+2, y, 8, '#dc2626'); y += 5; }); }
+    nl(1);
+    // 結論
+    setFill('#fff7ed'); setDraw('#fed7aa'); pdf.setLineWidth(0.3);
+    pdf.rect(M, y, CW, 9, 'FD');
+    jpText(conclusionStr.slice(0,60), M+3, y+2, 7.5, '#ea580c');
+    y += 10;
 
-    jpText(`作成日：${new Date().toLocaleDateString('ja-JP')}`, M+CW, H-M, 7, '#64748b', 'right');
+    drawFooter(1, 2);
 
     // ===== 2ページ目：グラフ① =====
     pdf.addPage();
@@ -4447,7 +4909,7 @@ async function printReport() {
     const maxRank = top10.length ? top10[0][1] : 1;
     top10.forEach(([name,val]) => { y = barRowFixed(name, val, maxRank, y); });
 
-    jpText(`作成日：${new Date().toLocaleDateString('ja-JP')}`, M+CW, H-M, 7, '#64748b', 'right');
+    drawFooter(2, 2);
 
     // ===== 保存 =====
     const month = fmtYM(sMonth).replace('-','');
@@ -4534,6 +4996,25 @@ function saveGasUrl() {
   const url = document.getElementById('gas-url').value.trim();
   localStorage.setItem('ce_gas_url', url);
   updateSyncStatus();
+}
+
+// ===================== PDF設定 =====================
+function getPdfSettings() {
+  return {
+    dept:   localStorage.getItem('ce_pdf_dept')   || '',
+    author: localStorage.getItem('ce_pdf_author') || ''
+  };
+}
+function savePdfSettings() {
+  localStorage.setItem('ce_pdf_dept',   (document.getElementById('pdf-dept')?.value||'').trim());
+  localStorage.setItem('ce_pdf_author', (document.getElementById('pdf-author')?.value||'').trim());
+}
+function loadPdfSettings() {
+  const s = getPdfSettings();
+  const deptEl   = document.getElementById('pdf-dept');
+  const authorEl = document.getElementById('pdf-author');
+  if (deptEl)   deptEl.value   = s.dept;
+  if (authorEl) authorEl.value = s.author;
 }
 
 function updateSyncStatus() {
