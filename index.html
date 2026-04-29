@@ -184,6 +184,13 @@ textarea { height: 76px; resize: vertical; font-size: 13px; line-height: 1.6; }
 .slot-val { font-family: 'JetBrains Mono', monospace; font-size: 18px; font-weight: 800; min-width: 24px; text-align: center; color: var(--text-dim); }
 .slot-counter.active .slot-val { color: var(--accent); }
 
+/* ===== 業務別担当者チップ（2人夜勤時） ===== */
+.reason-handler-row { margin-top: 6px; padding: 6px 8px; background: var(--surface2); border-radius: 8px; border-left: 3px solid var(--accent); }
+.reason-handler-task { font-size: 10px; font-weight: 700; color: var(--text-muted); margin-bottom: 4px; }
+.reason-handler-chips { display: flex; gap: 5px; flex-wrap: wrap; }
+.rh-chip { font-size: 11px; font-weight: 600; padding: 3px 10px; border-radius: 20px; border: 1.5px solid var(--border); background: var(--bg); color: var(--text-muted); cursor: pointer; transition: all 0.12s; }
+.rh-chip.sel { background: var(--accent-dim); border-color: var(--accent); color: var(--accent); font-weight: 700; }
+
 /* ===== 呼び出し理由チップ ===== */
 .oc-reason-chips { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 2px; }
 .oc-reason-chip { font-size: 10px; font-weight: 600; padding: 4px 8px; border-radius: 20px; border: 1.5px solid var(--border); background: var(--surface2); color: var(--text-muted); cursor: pointer; transition: all 0.12s; user-select: none; }
@@ -971,6 +978,9 @@ let ocCardiacDuration = null; // 'short'|'mid'|'long'|null
 let ocCallReasons = new Set();    // 呼び出し理由（業務名）
 let ocExtReasons = new Set();
 let ocCardiacReasons = new Set();
+let ocCallReasonHandlers = {};    // 業務名 → 担当者名（2人夜勤時のみ）
+let ocExtReasonHandlers = {};
+let ocCardiacReasonHandlers = {};
 let selExtCallers = new Set();       // オンコール外呼び出し：呼ばれたスタッフ
 let taskCounts = {}; // taskName -> total count
 let taskSlots = {};  // taskName -> {early, mid, late} 時間帯別
@@ -1068,8 +1078,19 @@ function renderStaff() {
       el.style.cssText = '';
       // 選択解除された人が主担当だったらリセット
       if (primaryHandler === n) primaryHandler = '';
+      // 選択解除された人が呼び出し理由の担当者にも入っていたら削除
+      [ocCallReasonHandlers, ocExtReasonHandlers, ocCardiacReasonHandlers].forEach(handlers => {
+        Object.keys(handlers).forEach(taskName => {
+          const h = handlers[taskName];
+          if (h instanceof Set) h.delete(n);
+          else if (Array.isArray(h)) handlers[taskName] = h.filter(x => x !== n);
+          else if (h === n) handlers[taskName] = new Set();
+        });
+      });
     }
     renderPrimaryHandler();
+    // 夜勤者が変わったら呼び出し理由の担当者チップも更新
+    ['call','ext','cardiac'].forEach(t => { if (document.getElementById(`oc-${t}-detail-panel`)?.style.display==='block') renderReasonChips(t); });
     updateProg();
   }, '');
 }
@@ -1181,7 +1202,7 @@ function toggleOC(type, val) {
     document.getElementById('oc-call-no').className = 'tgl-btn' + (val==='no'?' tgl-no':'');
     const dp = document.getElementById('oc-call-detail-panel');
     if (dp) dp.style.display = (val==='yes') ? 'block' : 'none';
-    if (val==='no') { ocCallDuration=null; ocCallReasons.clear(); updateDurationChips('call'); renderReasonChips('call'); }
+    if (val==='no') { ocCallDuration=null; ocCallReasons.clear(); ocCallReasonHandlers={}; updateDurationChips('call'); renderReasonChips('call'); }
     else if (val==='yes') renderReasonChips('call');
   } else if (type === 'ext') {
     ocExt = val;
@@ -1189,7 +1210,7 @@ function toggleOC(type, val) {
     document.getElementById('oc-ext-no').className = 'tgl-btn' + (val==='no'?' tgl-no':'');
     const dpExt = document.getElementById('oc-ext-detail-panel');
     if (dpExt) dpExt.style.display = (val==='yes') ? 'block' : 'none';
-    if (val==='no') { ocExtDuration=null; ocExtReasons.clear(); updateDurationChips('ext'); renderReasonChips('ext'); selExtCallers.clear(); renderExtCallerGrid(); }
+    if (val==='no') { ocExtDuration=null; ocExtReasons.clear(); ocExtReasonHandlers={}; updateDurationChips('ext'); renderReasonChips('ext'); selExtCallers.clear(); renderExtCallerGrid(); }
     else if (val==='yes') { renderReasonChips('ext'); renderExtCallerGrid(); }
   } else if (type === 'cardiac') {
     ocCardiac = val;
@@ -1197,7 +1218,7 @@ function toggleOC(type, val) {
     document.getElementById('oc-cardiac-no').className = 'tgl-btn' + (val==='no'?' tgl-no':'');
     const dpCard = document.getElementById('oc-cardiac-detail-panel');
     if (dpCard) dpCard.style.display = (val==='yes') ? 'block' : 'none';
-    if (val==='no') { ocCardiacDuration=null; ocCardiacReasons.clear(); updateDurationChips('cardiac'); renderReasonChips('cardiac'); }
+    if (val==='no') { ocCardiacDuration=null; ocCardiacReasons.clear(); ocCardiacReasonHandlers={}; updateDurationChips('cardiac'); renderReasonChips('cardiac'); }
     else if (val==='yes') renderReasonChips('cardiac');
   }
   updateProg();
@@ -1209,7 +1230,10 @@ function renderReasonChips(type) {
   const c = document.getElementById(containerId);
   if (!c) return;
   const reasons = type==='call' ? ocCallReasons : type==='ext' ? ocExtReasons : ocCardiacReasons;
+  const handlers = type==='call' ? ocCallReasonHandlers : type==='ext' ? ocExtReasonHandlers : ocCardiacReasonHandlers;
   const selClass = type==='cardiac' ? 'sel-red' : 'sel';
+  const isTwoPerson = selStaff.size >= 2;
+  const staffList = [...selStaff];
 
   // 入力済み業務を取得（件数1以上）
   const activeTasks = Object.entries(taskCounts).filter(([,v])=>v>0).map(([n])=>n);
@@ -1218,20 +1242,51 @@ function renderReasonChips(type) {
     return;
   }
   c.innerHTML = '';
+
   activeTasks.forEach(name => {
+    // 業務チップ
     const chip = document.createElement('span');
     chip.className = 'oc-reason-chip' + (reasons.has(name) ? ` ${selClass}` : '');
-    // 長い業務名は短縮表示
     chip.textContent = name.length > 14 ? name.slice(0,13)+'…' : name;
     chip.title = name;
     chip.onclick = () => {
       reasons.has(name) ? reasons.delete(name) : reasons.add(name);
+      if (!reasons.has(name)) delete handlers[name]; // 選択解除時に担当者もクリア
       renderReasonChips(type);
-      // エラー表示を消す
       const errEl = document.getElementById(`oc-${type}-reason-error`);
       if (errEl && reasons.size > 0) errEl.style.display = 'none';
     };
     c.appendChild(chip);
+
+    // 2人以上夜勤 & この業務が選択済みのとき → 担当者チップを展開（複数選択可）
+    if (isTwoPerson && reasons.has(name)) {
+      const handlerRow = document.createElement('div');
+      handlerRow.className = 'reason-handler-row';
+      const taskLabel = document.createElement('div');
+      taskLabel.className = 'reason-handler-task';
+      taskLabel.textContent = `${name.length>20?name.slice(0,19)+'…':name} の担当者（複数可）`;
+      handlerRow.appendChild(taskLabel);
+      const chipRow = document.createElement('div');
+      chipRow.className = 'reason-handler-chips';
+      // handlers[name] を Set として扱う（旧形式の文字列・配列にも対応）
+      if (!(handlers[name] instanceof Set)) {
+        const v = handlers[name];
+        handlers[name] = Array.isArray(v) ? new Set(v) : (v && typeof v === 'string' ? new Set([v]) : new Set());
+      }
+      staffList.forEach(staffName => {
+        const sc = document.createElement('span');
+        sc.className = 'rh-chip' + (handlers[name].has(staffName) ? ' sel' : '');
+        sc.textContent = staffName;
+        sc.onclick = () => {
+          if (handlers[name].has(staffName)) handlers[name].delete(staffName);
+          else handlers[name].add(staffName);
+          renderReasonChips(type);
+        };
+        chipRow.appendChild(sc);
+      });
+      handlerRow.appendChild(chipRow);
+      c.appendChild(handlerRow);
+    }
   });
 }
 
@@ -1381,6 +1436,7 @@ function chgSlot(btn) {
   // 件数が0になったら理由から除外
   if (taskCounts[name] === 0) {
     ocCallReasons.delete(name); ocExtReasons.delete(name); ocCardiacReasons.delete(name);
+    delete ocCallReasonHandlers[name]; delete ocExtReasonHandlers[name]; delete ocCardiacReasonHandlers[name];
   }
   renderTasks();
   renderFavTasks();
@@ -1514,6 +1570,16 @@ function copyPrevious() {
   taskCounts = { ...(prev.tasks||{}) };
   taskSlots = {};
   primaryHandler = prev.primaryHandler || '';
+  ocCallDuration = prev.ocCallDuration || null;
+  ocExtDuration  = prev.ocExtDuration  || null;
+  ocCardiacDuration = prev.ocCardiacDuration || null;
+  ocCallReasons    = new Set(prev.ocCallReasons    || []);
+  ocExtReasons     = new Set(prev.ocExtReasons     || []);
+  ocCardiacReasons = new Set(prev.ocCardiacReasons || []);
+  const toHandlerSet = (obj) => Object.fromEntries(Object.entries(obj||{}).map(([k,v])=>[k, Array.isArray(v)?new Set(v):v instanceof Set?v:(v?new Set([v]):new Set())]));
+  ocCallReasonHandlers    = toHandlerSet(prev.ocCallReasonHandlers);
+  ocExtReasonHandlers     = toHandlerSet(prev.ocExtReasonHandlers);
+  ocCardiacReasonHandlers = toHandlerSet(prev.ocCardiacReasonHandlers);
   // 時間帯情報があれば復元、なければ「前半」にまとめる
   Object.entries(prev.tasks||{}).forEach(([n,v])=>{
     if (prev.taskSlots && prev.taskSlots[n]) taskSlots[n] = {...prev.taskSlots[n]};
@@ -1534,9 +1600,7 @@ function copyPrevious() {
   renderTasks();
   renderFavTasks();
   renderFree();
-  renderExtCallerGrid();
-  if (ocCall) toggleOC('call', ocCall);
-  if (ocExt) toggleOC('ext', ocExt);
+  restoreOCPanels();
   updateProg();
   showToast(`📋 ${fmtDate(prev.date)} をコピーしました`);
 }
@@ -1633,10 +1697,13 @@ function saveRecord() {
     cardiacOncall:[...selCardiacOncall],
     ocCallDuration: ocCall==='yes' ? (ocCallDuration||null) : null,
     ocCallReasons: ocCall==='yes' ? [...ocCallReasons] : [],
+    ocCallReasonHandlers: ocCall==='yes' ? Object.fromEntries(Object.entries(ocCallReasonHandlers).map(([k,v])=>[k,v instanceof Set?[...v]:(v?[v]:[])])) : {},
     ocExtDuration: ocExt==='yes' ? (ocExtDuration||null) : null,
     ocExtReasons: ocExt==='yes' ? [...ocExtReasons] : [],
+    ocExtReasonHandlers: ocExt==='yes' ? Object.fromEntries(Object.entries(ocExtReasonHandlers).map(([k,v])=>[k,v instanceof Set?[...v]:(v?[v]:[])])) : {},
     ocCardiacDuration: ocCardiac==='yes' ? (ocCardiacDuration||null) : null,
     ocCardiacReasons: ocCardiac==='yes' ? [...ocCardiacReasons] : [],
+    ocCardiacReasonHandlers: ocCardiac==='yes' ? Object.fromEntries(Object.entries(ocCardiacReasonHandlers).map(([k,v])=>[k,v instanceof Set?[...v]:(v?[v]:[])])) : {},
     tasks,
     taskSlots: savedSlots,
     freeTasks: freeTasks.filter(ft=>ft.name.trim()),
@@ -1672,6 +1739,7 @@ function resetForm(fromDate) {
   ocCall=null; ocExt=null; ocCardiac=null;
   ocCallDuration=null; ocExtDuration=null; ocCardiacDuration=null;
   ocCallReasons.clear(); ocExtReasons.clear(); ocCardiacReasons.clear();
+  ocCallReasonHandlers={}; ocExtReasonHandlers={}; ocCardiacReasonHandlers={};
   updateDurationChips('call'); updateDurationChips('ext'); updateDurationChips('cardiac');
   const dpCall=document.getElementById('oc-call-detail-panel');
   const dpExt=document.getElementById('oc-ext-detail-panel');
@@ -1690,7 +1758,33 @@ function resetForm(fromDate) {
   window.scrollTo({top:0,behavior:'smooth'});
 }
 
-// ===================== STORAGE =====================
+// OC詳細パネルの表示状態を復元（state変数はそのまま、パネルとchipsだけ更新）
+function restoreOCPanels() {
+  ['call','ext','cardiac'].forEach(type => {
+    const val = type==='call' ? ocCall : type==='ext' ? ocExt : ocCardiac;
+    const panelId = `oc-${type}-detail-panel`;
+    const panel = document.getElementById(panelId);
+    if (panel) panel.style.display = (val==='yes') ? 'block' : 'none';
+    // ボタンのスタイル
+    const yesId = `oc-${type}-yes`, noId = `oc-${type}-no`;
+    const yesEl = document.getElementById(yesId), noEl = document.getElementById(noId);
+    if (yesEl) yesEl.className = 'tgl-btn' + (val==='yes' ? ' tgl-yes' : '');
+    if (noEl)  noEl.className  = 'tgl-btn' + (val==='no'  ? ' tgl-no'  : '');
+    // 拘束時間チップ
+    updateDurationChips(type);
+    // 呼び出し理由チップ
+    if (val==='yes') renderReasonChips(type);
+  });
+  // OC外スタッフパネル
+  const extPanel = document.getElementById('ext-caller-panel');
+  if (extPanel) {
+    if (ocExt==='yes') extPanel.classList.add('show');
+    else extPanel.classList.remove('show');
+  }
+  renderExtCallerGrid();
+}
+
+
 function getRecords() { try { return JSON.parse(localStorage.getItem('ce_v3')||'[]'); } catch { return []; } }
 
 // ===================== 時間帯合計ヘルパー =====================
@@ -1897,6 +1991,17 @@ function loadRecord(r) {
   selCardiacOncall=new Set(r.cardiacOncall||[]);
   selExtCallers=new Set(r.extCallers||[]);
   ocCall=r.ocCall||null; ocExt=r.ocExt||null; ocCardiac=r.ocCardiac||null;
+  ocCallDuration = r.ocCallDuration || null;
+  ocExtDuration  = r.ocExtDuration  || null;
+  ocCardiacDuration = r.ocCardiacDuration || null;
+  ocCallReasons    = new Set(r.ocCallReasons    || []);
+  ocExtReasons     = new Set(r.ocExtReasons     || []);
+  ocCardiacReasons = new Set(r.ocCardiacReasons || []);
+  const toHandlerSet2 = (obj) => Object.fromEntries(Object.entries(obj||{}).map(([k,v])=>[k, Array.isArray(v)?new Set(v):v instanceof Set?v:(v?new Set([v]):new Set())]));
+  ocCallReasonHandlers    = toHandlerSet2(r.ocCallReasonHandlers);
+  ocExtReasonHandlers     = toHandlerSet2(r.ocExtReasonHandlers);
+  ocCardiacReasonHandlers = toHandlerSet2(r.ocCardiacReasonHandlers);
+  primaryHandler = r.primaryHandler || '';
   taskCounts={...r.tasks||{}};
   taskSlots = {};
   Object.entries(r.tasks||{}).forEach(([n,v])=>{
@@ -1909,12 +2014,9 @@ function loadRecord(r) {
   }));
   // 値が入っているグループは自動展開
   collapsedGroups = new Set(TASK_GROUPS.filter(g=>!g.tasks.some(n=>taskCounts[n]>0)).map(g=>g.id));
-  renderStaff(); renderOncall(); renderCardiacOncall();
-  renderExtCallerGrid();
+  renderStaff(); renderPrimaryHandler(); renderOncall(); renderCardiacOncall();
   renderFavTasks(); renderTasks(); renderFree();
-  if(ocCall) toggleOC('call',ocCall);
-  if(ocExt) toggleOC('ext',ocExt);
-  if(ocCardiac) toggleOC('cardiac',ocCardiac);
+  restoreOCPanels();
   updateProg();
   showTab('input'); window.scrollTo({top:0,behavior:'smooth'});
   showToast('📋 読み込みました');
@@ -2165,20 +2267,46 @@ function exportXLSX(mode) {
   // ===== Sheet1: 日次生データ =====
   const allTasks = [...new Set(recs.flatMap(r=>Object.keys(r.tasks||{})))].sort();
   const allFreeNames = [...new Set(recs.flatMap(r=>(r.freeTasks||[]).map(ft=>ft.name).filter(Boolean)))].sort();
-  const headers1 = ['日付','曜日','夜勤者','オンコール担当','呼び出し','オンコール外呼び出し','オンコール外呼び出し者','心外オンコール担当','心外OC呼び出し',
+  const headers1 = ['日付','曜日','夜勤者','主担当者','オンコール担当','呼び出し','OC拘束時間','OC呼び出し理由','OC担当者(業務別)',
+    'オンコール外呼び出し','OC外拘束時間','OC外呼び出し理由','OC外担当者(業務別)','オンコール外呼び出し者',
+    '心外オンコール担当','心外OC呼び出し','心外OC拘束時間','心外OC呼び出し理由','心外OC担当者(業務別)',
     ...allTasks,...allFreeNames.map(n=>'[自由]'+n),'業務合計','準夜件数(16:30-22:00)','深夜件数(22:00-翌3:30)','早朝件数(翌3:30-9:00)','メモ'];
+  const durJp = { short:'〜1h', mid:'1〜3h', long:'3h超' };
+  const fmtReasonsCell = (rsns, rec, durKey) => {
+    if (!rsns || !rsns.length) return '';
+    return rsns.join('・');
+  };
+  const fmtHandlersCell = (handlers) => {
+    if (!handlers) return '';
+    const parts = Object.entries(handlers).filter(([,v])=>v && (Array.isArray(v)?v.length:true)).map(([task,v])=>{
+      const list = Array.isArray(v) ? v : (v ? [v] : []);
+      return list.length ? `${task}：${list.join('・')}` : '';
+    }).filter(Boolean);
+    return parts.join(' / ');
+  };
   const data1 = recs.map(r=>{
     const dow=['日','月','火','水','木','金','土'][new Date(r.date+'T00:00:00').getDay()];
     const taskCols = allTasks.map(t=>r.tasks?.[t]||0);
     const freeCols = allFreeNames.map(n=>{ const ft=(r.freeTasks||[]).find(f=>f.name===n); return ft?ft.count||1:0; });
     const total = taskCols.reduce((s,v)=>s+v,0)+freeCols.reduce((s,v)=>s+v,0);
     const slots = getRecordSlotTotals(r);
-    return [r.date, dow, (r.staff||[]).join('・'), (r.oncall||[]).join('・'),
+    return [r.date, dow, (r.staff||[]).join('・'),
+      r.primaryHandler||'',
+      (r.oncall||[]).join('・'),
       r.ocCall==='yes'?'あり':r.ocCall==='no'?'なし':'',
+      r.ocCallDuration?durJp[r.ocCallDuration]:'',
+      fmtReasonsCell(r.ocCallReasons),
+      fmtHandlersCell(r.ocCallReasonHandlers),
       r.ocExt==='yes'?'あり':r.ocExt==='no'?'なし':'',
+      r.ocExtDuration?durJp[r.ocExtDuration]:'',
+      fmtReasonsCell(r.ocExtReasons),
+      fmtHandlersCell(r.ocExtReasonHandlers),
       (r.extCallers||[]).join('・'),
       (r.cardiacOncall||[]).join('・'),
       r.ocCardiac==='yes'?'あり':r.ocCardiac==='no'?'なし':'',
+      r.ocCardiacDuration?durJp[r.ocCardiacDuration]:'',
+      fmtReasonsCell(r.ocCardiacReasons),
+      fmtHandlersCell(r.ocCardiacReasonHandlers),
       ...taskCols,...freeCols, total, slots.early, slots.mid, slots.late, r.memo||''];
   });
   const ws1 = XLSX.utils.aoa_to_sheet([headers1,...data1]);
@@ -3476,26 +3604,30 @@ function renderAnnualReport() {
   const hasAnnDur=Object.values(annCallDur).some(v=>v>0)||Object.values(annExtDur).some(v=>v>0)||Object.values(annCardiacDur).some(v=>v>0);
 
   // 年次：呼び出し理由集計
-  const buildAnnReasonSummary = (recs, ocKey, reasonKey, durKey) => {
+  const buildAnnReasonSummary = (recs, ocKey, reasonKey, durKey, handlerKey) => {
     const reasonMap = {};
     recs.forEach(r => {
       if (r[ocKey] !== 'yes') return;
       (r[reasonKey]||[]).forEach(name => {
-        if (!reasonMap[name]) reasonMap[name] = { total:0, short:0, mid:0, long:0 };
+        if (!reasonMap[name]) reasonMap[name] = { total:0, short:0, mid:0, long:0, handlerCnt:{} };
         reasonMap[name].total++;
         const dur = r[durKey];
         if (dur) reasonMap[name][dur]++;
+        const h = (r[handlerKey]||{})[name];
+        const hList = Array.isArray(h) ? h : (h ? [h] : []);
+        hList.forEach(hn => { if(hn) reasonMap[name].handlerCnt[hn]=(reasonMap[name].handlerCnt[hn]||0)+1; });
       });
     });
     return Object.entries(reasonMap).sort((a,b)=>b[1].total-a[1].total).map(([name,d]) => {
       const dp = Object.entries(annDurLabel).filter(([k])=>d[k]>0).map(([k])=>`${annDurLabel[k]}:${d[k]}回`);
+      const hs = Object.entries(d.handlerCnt).sort((a,b)=>b[1]-a[1]).map(([n,v])=>`${n}:${v}回`).join('・');
       const short = name.length>20?name.slice(0,19)+'…':name;
-      return `    ${short}：${d.total}回${dp.length?`（${dp.join('・')}）`:''}`;
+      return `    ${short}：${d.total}回${dp.length?`（${dp.join('・')}）`:''}${hs?` ／ ${hs}`:''}`;
     }).join('\n');
   };
-  const annCallReason    = buildAnnReasonSummary(yearRecs,'ocCall',   'ocCallReasons',   'ocCallDuration');
-  const annExtReason     = buildAnnReasonSummary(yearRecs,'ocExt',    'ocExtReasons',    'ocExtDuration');
-  const annCardiacReason = buildAnnReasonSummary(yearRecs,'ocCardiac','ocCardiacReasons','ocCardiacDuration');
+  const annCallReason    = buildAnnReasonSummary(yearRecs,'ocCall',   'ocCallReasons',   'ocCallDuration',   'ocCallReasonHandlers');
+  const annExtReason     = buildAnnReasonSummary(yearRecs,'ocExt',    'ocExtReasons',    'ocExtDuration',    'ocExtReasonHandlers');
+  const annCardiacReason = buildAnnReasonSummary(yearRecs,'ocCardiac','ocCardiacReasons','ocCardiacDuration','ocCardiacReasonHandlers');
   const hasAnnReason = annCallReason||annExtReason||annCardiacReason;
   const months=[4,5,6,7,8,9,10,11,12,1,2,3].map(m=>{ const y=m>=4?annualYear:annualYear+1; return String(y)+'-'+String(m).padStart(2,'0'); });
   const monthLabels=months.map(m=>m.slice(5)+'月');
@@ -3673,6 +3805,13 @@ async function printAnnualReport() {
     };
 
     const LBAR = 58; // ラベル固定幅mm（全棒グラフ共通）
+    const checkPage = (needed=10) => { if (y+needed > H-M) { pdf.addPage(); y=M; } };
+    const buildPdfReason = (recs, ocKey, reasonKey, durKey, handlerKey) => {
+      const dl={short:'〜1h',mid:'1〜3h',long:'3h超'};
+      const m={};
+      recs.forEach(r=>{ if(r[ocKey]!=='yes') return; const handlers=r[handlerKey]||{}; (r[reasonKey]||[]).forEach(name=>{ if(!m[name])m[name]={total:0,short:0,mid:0,long:0,hc:{}}; m[name].total++; if(r[durKey])m[name][r[durKey]]++; const h=handlers[name]; const hList=Array.isArray(h)?h:(h?[h]:[]); hList.forEach(hn=>{if(hn)m[name].hc[hn]=(m[name].hc[hn]||0)+1;}); }); });
+      return Object.entries(m).sort((a,b)=>b[1].total-a[1].total).map(([name,d])=>{ const dp=Object.entries(dl).filter(([k])=>d[k]>0).map(([k])=>`${dl[k]}:${d[k]}回`); const hs=Object.entries(d.hc).sort((a,b)=>b[1]-a[1]).map(([n,v])=>`${n}:${v}回`).join('・'); const s=name.length>18?name.slice(0,17)+'…':name; return `${s}：${d.total}回${dp.length?`（${dp.join(' ')}）`:''}${hs?` ／ ${hs}`:''}`; });
+    };
     const barRow = (label, val, maxVal, fy, barColor='#3b82f6', rowH=5.5) => {
       const short = label.length>20?label.slice(0,19)+'…':label;
       jpText(short,M,fy,8.5,'#1e293b');
@@ -3703,8 +3842,8 @@ async function printAnnualReport() {
     const assistCnt=Object.entries(taskTot).filter(([n])=>assistKw.some(k=>n.includes(k))).reduce((s,[,v])=>s+v,0);
     const emergCnt=Object.entries(taskTot).filter(([n])=>emergKw.some(k=>n.includes(k))).reduce((s,[,v])=>s+v,0);
     const pacingCnt=taskTot['体外式ペースメーカー挿入']||0;
-    const ocCall=yearRecs.filter(r=>r.ocCall==='yes').length;
-    const ocExt=yearRecs.filter(r=>r.ocExt==='yes').length;
+    const ocCallCnt=yearRecs.filter(r=>r.ocCall==='yes').length;
+    const ocExtCnt=yearRecs.filter(r=>r.ocExt==='yes').length;
     const ocCardiacCnt=yearRecs.filter(r=>r.ocCardiac==='yes').length;
     const slots=sumSlots(yearRecs);
     const slotSum=slots.early+slots.mid+slots.late;
@@ -3725,6 +3864,16 @@ async function printAnnualReport() {
     })).sort((a,b)=>b.total-a.total).slice(0,5);
     const extCallerMap={};
     yearRecs.forEach(r=>{if(r.ocExt==='yes')(r.extCallers||[]).forEach(s=>{extCallerMap[s]=(extCallerMap[s]||0)+1;});});
+
+    // 拘束時間内訳（年次PDF用）
+    const annCallDur={short:0,mid:0,long:0}, annExtDur={short:0,mid:0,long:0}, annCardiacDur={short:0,mid:0,long:0};
+    yearRecs.forEach(r=>{
+      if(r.ocCall==='yes'    && r.ocCallDuration)    annCallDur[r.ocCallDuration]=(annCallDur[r.ocCallDuration]||0)+1;
+      if(r.ocExt==='yes'     && r.ocExtDuration)     annExtDur[r.ocExtDuration]=(annExtDur[r.ocExtDuration]||0)+1;
+      if(r.ocCardiac==='yes' && r.ocCardiacDuration) annCardiacDur[r.ocCardiacDuration]=(annCardiacDur[r.ocCardiacDuration]||0)+1;
+    });
+    const annDurLabel={short:'〜1h',mid:'1〜3h',long:'3h超'};
+    const annFmtDur=(cnt)=>{ const p=Object.entries(cnt).filter(([,v])=>v>0).map(([k,v])=>`${annDurLabel[k]}:${v}回`); return p.length?`（${p.join('・')}）`:''; };
     const cardiacReport=CARDIAC_ONCALL_STAFF.map(n=>({name:n,oncall:yearRecs.filter(r=>(r.cardiacOncall||[]).includes(n)).length,called:yearRecs.filter(r=>(r.cardiacOncall||[]).includes(n)&&r.ocCardiac==='yes').length})).filter(d=>d.oncall>0);
     const months=[4,5,6,7,8,9,10,11,12,1,2,3].map(m=>{ const y=m>=4?annualYear:annualYear+1; return String(y)+'-'+String(m).padStart(2,'0'); });
     const monthLabels=months.map(m=>m.slice(5)+'月');
@@ -3774,46 +3923,89 @@ async function printAnnualReport() {
     });
     y+=2; nl(1);
 
+    checkPage(20);
     y=sectionHeader('■ 業務種別 上位5項目（年間）',y); nl(2);
     const maxT5=top5.length?top5[0][1]:1;
-    top5.forEach(([name,val])=>{y=barRow(name,val,maxT5,y,'#3b82f6');}); nl(1);
+    top5.forEach(([name,val])=>{ checkPage(8); y=barRow(name,val,maxT5,y,'#3b82f6');}); nl(1);
 
+    checkPage(20);
     y=sectionHeader('■ 時間帯別業務分布（年間累計）',y); nl(2);
     if(slotSum>0){
       [['準夜（16:30〜22:00）',slots.early,'#3b82f6'],['深夜（22:00〜翌3:30）',slots.mid,'#7c3aed'],['早朝（翌3:30〜9:00）',slots.late,'#06b6d4']].forEach(([l,v,c])=>{
+        checkPage(8);
         const pct=Math.round(v/slotSum*100),bw=Math.max(1,(CW-LBAR-22)*pct/100);
         jpText(l,M,y,9,'#1e293b'); setFill(c); if(bw>0&&isFinite(bw)) pdf.rect(M+LBAR,y+0.8,bw,3.5,'F');
         jpText(`${v}件(${pct}%)`,M+CW,y,9,'#1e293b','right'); hLine(y+5.5,'#e2e8f0',0.2); y+=6;
       });
     } nl(1);
 
+    checkPage(20);
     y=sectionHeader('■ 今年の特記業務（年間）',y,'#dc2626'); nl(2);
     buildSpecialReport(taskTot, nights, 'annual').split('\n').forEach(line=>{
+      checkPage(6);
       const isDetail = line.startsWith('　');
       jpText(line.trimStart(), M+(isDetail?8:2), y, isDetail?7.5:8, isDetail?'#64748b':'#dc2626');
       y += isDetail?4:4.5;
     }); nl(1);
 
+    // OC状況（年間）- 拘束時間・呼び出し理由・スタッフ反映済み
+    checkPage(40);
     y=sectionHeader('■ オンコール状況（年間）',y); nl(2);
-    jpText(`OC担当呼び出し：${ocCall}回（呼び出し率 ${nights?Math.round(ocCall/nights*100):0}%）`,M+2,y,9,'#1e293b'); y+=5;
-    jpText(`OC外呼び出し：${ocExt}回${Object.keys(extCallerMap).length?'　'+Object.entries(extCallerMap).map(([n,v])=>`${n}:${v}回`).join('・'):''}`,M+2,y,8,'#1e293b'); y+=5;
-    jpText(`心外OC呼び出し：${ocCardiacCnt}回`,M+2,y,9,'#1e293b'); y+=5; nl(1);
+    checkPage(8);
+    jpText(`OC担当呼び出し：${ocCallCnt}回（呼び出し率 ${nights?Math.round(ocCallCnt/nights*100):0}%）${annFmtDur(annCallDur)}`,M+2,y,8,'#1e293b'); y+=5;
+    const annPdfCallStaffCnt={};
+    yearRecs.filter(r=>r.ocCall==='yes').forEach(r=>(r.oncall||[]).filter(n=>n&&n!=='なし').forEach(n=>{ annPdfCallStaffCnt[n]=(annPdfCallStaffCnt[n]||0)+1; }));
+    const annPdfCallStaffStr=Object.entries(annPdfCallStaffCnt).sort((a,b)=>b[1]-a[1]).map(([n,v])=>`${n}：${v}回`).join('・');
+    if(annPdfCallStaffStr){ checkPage(6); jpText(`  呼び出されたスタッフ：${annPdfCallStaffStr}`,M+4,y,7,'#64748b'); y+=4; }
+    buildPdfReason(yearRecs,'ocCall','ocCallReasons','ocCallDuration','ocCallReasonHandlers').forEach(line=>{ checkPage(6); jpText(`  ${line}`,M+4,y,7,'#64748b'); y+=4; });
+
+    checkPage(8);
+    jpText(`OC外呼び出し：${ocExtCnt}回${annFmtDur(annExtDur)}`,M+2,y,8,'#1e293b'); y+=5;
+    if(Object.keys(extCallerMap).length){ checkPage(6); jpText(`  呼び出されたスタッフ：${Object.entries(extCallerMap).sort((a,b)=>b[1]-a[1]).map(([n,v])=>`${n}：${v}回`).join('・')}`,M+4,y,7,'#64748b'); y+=4; }
+    buildPdfReason(yearRecs,'ocExt','ocExtReasons','ocExtDuration','ocExtReasonHandlers').forEach(line=>{ checkPage(6); jpText(`  ${line}`,M+4,y,7,'#64748b'); y+=4; });
+
+    checkPage(8);
+    jpText(`心外OC呼び出し：${ocCardiacCnt}回${annFmtDur(annCardiacDur)}`,M+2,y,8,'#1e293b'); y+=5;
+    const annPdfCardiacStaffCnt={};
+    yearRecs.filter(r=>r.ocCardiac==='yes').forEach(r=>(r.cardiacOncall||[]).forEach(n=>{ annPdfCardiacStaffCnt[n]=(annPdfCardiacStaffCnt[n]||0)+1; }));
+    const annPdfCardiacStaffStr=Object.entries(annPdfCardiacStaffCnt).sort((a,b)=>b[1]-a[1]).map(([n,v])=>`${n}：${v}回`).join('・');
+    if(annPdfCardiacStaffStr){ checkPage(6); jpText(`  呼び出されたスタッフ：${annPdfCardiacStaffStr}`,M+4,y,7,'#64748b'); y+=4; }
+    buildPdfReason(yearRecs,'ocCardiac','ocCardiacReasons','ocCardiacDuration','ocCardiacReasonHandlers').forEach(line=>{ checkPage(6); jpText(`  ${line}`,M+4,y,7,'#64748b'); y+=4; });
+    nl(1);
 
     if(cardiacReport.length){
+      checkPage(12);
       y=sectionHeader('■ 心外オンコール 担当者別集計（年間）',y); nl(2);
-      cardiacReport.forEach(d=>{const rate=d.oncall?Math.round(d.called/d.oncall*100):0;jpText(`${d.name}：担当${d.oncall}回 / 呼び出し${d.called}回（${rate}%）`,M+2,y,9,'#1e293b');y+=5;}); nl(1);
+      cardiacReport.forEach(d=>{ checkPage(6); const rate=d.oncall?Math.round(d.called/d.oncall*100):0;jpText(`${d.name}：担当${d.oncall}回 / 呼び出し${d.called}回（${rate}%）`,M+2,y,8,'#1e293b');y+=5;}); nl(1);
     }
 
+    checkPage(35);
+    checkPage(35);
     y=sectionHeader('■ 所見・課題',y,'#dc2626'); nl(2);
-    const issues=[
-      assistCnt/nights>=0.5?`・補助循環導入率${Math.round(assistCnt/nights*100)}%と高水準。夜間体制の強化・増員を要する。`:null,
-      emergCnt>nights?'・緊急カテ対応が1夜勤あたり1件超。夜間即応体制の整備が必要。':null,
-      ocExt>0?`・年間${ocExt}回のOC外呼び出しが発生。即応体制の整備が必要。`:null,
-      slots.mid>slots.early&&slots.mid>slots.late?'・深夜帯への業務集中が顕著。仮眠確保・応援体制の整備が望まれる。':null,
-    ].filter(Boolean);
-    if(!issues.length){jpText('・特記事項なし',M+2,y,9,'#64748b');y+=5;}
-    else{issues.forEach(t=>{jpText(t,M+2,y,9,'#1e293b');y+=5;});}
-    jpText(`作成日：${new Date().toLocaleDateString('ja-JP')}`,M+CW,H-M,8,'#64748b','right');
+    const pdfAnnIssues=[], pdfAnnUrgent=[];
+    if(assistCnt/nights>=0.5){pdfAnnIssues.push(`・補助循環導入率${Math.round(assistCnt/nights*100)}%と高水準`);pdfAnnUrgent.push('夜間体制強化・増員');}
+    if(emergCnt>nights){pdfAnnIssues.push('・緊急カテ対応が1夜勤あたり1件超');pdfAnnUrgent.push('夜間即応体制拡充');}
+    if(ocExtCnt>0){pdfAnnIssues.push(`・年間${ocExtCnt}回のOC外呼び出し発生`);pdfAnnUrgent.push('即応体制整備');}
+    if(slots.mid>slots.early&&slots.mid>slots.late){pdfAnnIssues.push('・深夜帯への業務集中が顕著');pdfAnnUrgent.push('深夜帯応援体制');}
+    const pdfAnnHasU=pdfAnnUrgent.length>0;
+    const pdfAnnSummary=pdfAnnHasU?`年間を通じて${pdfAnnIssues.length}件の課題が確認。特に${pdfAnnUrgent.slice(0,2).join('・')}について対応が求められる。`:'年間を通じて夜勤業務は概ね安定して推移した。引き続きデータの蓄積を継続する。';
+    const pdfAnnConclusion=pdfAnnHasU?'【結論】夜勤体制の見直し・人員配置の検討を年次上申として提出する。':'【結論】現状の夜勤体制は適切に機能している。次年度も引き続きデータを集積し比較分析に活用する。';
+    jpText(pdfAnnSummary.slice(0,55),M+2,y,7.5,'#1e293b'); y+=5;
+    if(pdfAnnSummary.length>55){jpText(pdfAnnSummary.slice(55),M+2,y,7.5,'#1e293b'); y+=5;}
+    nl(1);
+    if(!pdfAnnIssues.length){jpText('・特記すべき課題事項なし',M+2,y,8,'#64748b');y+=5;}
+    else{pdfAnnIssues.forEach(t=>{checkPage(6);jpText(t,M+2,y,8,'#dc2626');y+=5;});}
+    nl(1);
+    setFill('#fff7ed'); setDraw('#fed7aa'); pdf.setLineWidth(0.3);
+    pdf.rect(M,y,CW,9,'FD');
+    jpText(pdfAnnConclusion.slice(0,60),M+3,y+2,7.5,'#ea580c'); y+=10;
+
+    // 1ページ目フッター
+    const annPdfSettings = getPdfSettings();
+    hLine(H-M+2,'#cbd5e1',0.4);
+    jpText(`${annPdfSettings.dept||'臨床工学室'}　${annPdfSettings.author||'CE夜勤業務集計システム'}`,M,H-M+4,6.5,'#94a3b8');
+    jpText(`作成日：${new Date().toLocaleDateString('ja-JP')}`,M+CW/2,H-M+4,6.5,'#94a3b8','center');
+    jpText(`1 / 4`,M+CW,H-M+4,6.5,'#94a3b8','right');
 
     // ===== 2ページ =====
     pdf.addPage(); y=M;
@@ -3837,7 +4029,10 @@ async function printAnnualReport() {
     y=sectionHeader('■ 業務件数 ランキング TOP10（年間）',y); nl(2);
     const maxR=top10.length?top10[0][1]:1;
     top10.forEach(([name,val])=>{y=barRow(name,val,maxR,y,'#3b82f6',5);});
-    jpText(`作成日：${new Date().toLocaleDateString('ja-JP')}`,M+CW,H-M,8,'#64748b','right');
+    hLine(H-M+2,'#cbd5e1',0.4);
+    jpText(`${annPdfSettings.dept||'臨床工学室'}　${annPdfSettings.author||'CE夜勤業務集計システム'}`,M,H-M+4,6.5,'#94a3b8');
+    jpText(`作成日：${new Date().toLocaleDateString('ja-JP')}`,M+CW/2,H-M+4,6.5,'#94a3b8','center');
+    jpText(`2 / 4`,M+CW,H-M+4,6.5,'#94a3b8','right');
 
     // ===== 3ページ =====
     pdf.addPage(); y=M;
@@ -3864,7 +4059,10 @@ async function printAnnualReport() {
       });
     }
 
-    jpText(`作成日：${new Date().toLocaleDateString('ja-JP')}`,M+CW,H-M,8,'#64748b','right');
+    hLine(H-M+2,'#cbd5e1',0.4);
+    jpText(`${annPdfSettings.dept||'臨床工学室'}　${annPdfSettings.author||'CE夜勤業務集計システム'}`,M,H-M+4,6.5,'#94a3b8');
+    jpText(`作成日：${new Date().toLocaleDateString('ja-JP')}`,M+CW/2,H-M+4,6.5,'#94a3b8','center');
+    jpText(`3 / 4`,M+CW,H-M+4,6.5,'#94a3b8','right');
 
     // ===== 4ページ：スタッフランキング① =====
     pdf.addPage(); y=M;
@@ -3957,7 +4155,10 @@ async function printAnnualReport() {
     pdfRankSection('■ 【番外編】OC外呼び出し TOP10','#dc2626',sd=>sd.ocExt,'回');
     pdfRankSection('■ 【番外編】心外OC呼び出し TOP10','#7c3aed',sd=>sd.ocCardiac,'回');
 
-    jpText(`作成日：${new Date().toLocaleDateString('ja-JP')}`,M+CW,H-M,8,'#64748b','right');
+    hLine(H-M+2,'#cbd5e1',0.4);
+    jpText(`${annPdfSettings.dept||'臨床工学室'}　${annPdfSettings.author||'CE夜勤業務集計システム'}`,M,H-M+4,6.5,'#94a3b8');
+    jpText(`作成日：${new Date().toLocaleDateString('ja-JP')}`,M+CW/2,H-M+4,6.5,'#94a3b8','center');
+    jpText(`4 / 4`,M+CW,H-M+4,6.5,'#94a3b8','right');
 
     pdf.save(`CE夜勤業務実績報告_${annualYear}年度.pdf`);
   } catch(e) {
@@ -4061,27 +4262,32 @@ function renderReport() {
   };
 
   // 呼び出し理由集計（業務名→{回数, 時間別}）
-  const buildReasonSummary = (recs, ocKey, reasonKey, durKey) => {
-    const reasonMap = {}; // 業務名 → {total, short, mid, long}
+  const buildReasonSummary = (recs, ocKey, reasonKey, durKey, handlerKey) => {
+    const reasonMap = {};
     recs.forEach(r => {
       if (r[ocKey] !== 'yes') return;
       const reasons = r[reasonKey] || [];
       const dur = r[durKey] || null;
+      const handlers = r[handlerKey] || {};
       reasons.forEach(name => {
-        if (!reasonMap[name]) reasonMap[name] = { total:0, short:0, mid:0, long:0 };
+        if (!reasonMap[name]) reasonMap[name] = { total:0, short:0, mid:0, long:0, handlerCnt:{} };
         reasonMap[name].total++;
         if (dur) reasonMap[name][dur]++;
+        const h = handlers[name];
+        const hList = Array.isArray(h) ? h : (h ? [h] : []);
+        hList.forEach(hn => { if(hn) reasonMap[name].handlerCnt[hn]=(reasonMap[name].handlerCnt[hn]||0)+1; });
       });
     });
     return Object.entries(reasonMap).sort((a,b)=>b[1].total-a[1].total).map(([name, d]) => {
       const durParts = Object.entries(durLabel).filter(([k])=>d[k]>0).map(([k])=>`${durLabel[k]}:${d[k]}回`);
+      const handlerStr = Object.entries(d.handlerCnt).sort((a,b)=>b[1]-a[1]).map(([n,v])=>`${n}:${v}回`).join('・');
       const short = name.length > 20 ? name.slice(0,19)+'…' : name;
-      return `    ${short}：${d.total}回${durParts.length ? `（${durParts.join('・')}）` : ''}`;
+      return `    ${short}：${d.total}回${durParts.length?`（${durParts.join('・')}）`:''}${handlerStr?` ／ ${handlerStr}`:''}`;
     }).join('\n');
   };
-  const callReasonSummary    = buildReasonSummary(curRecs, 'ocCall',    'ocCallReasons',    'ocCallDuration');
-  const extReasonSummary     = buildReasonSummary(curRecs, 'ocExt',     'ocExtReasons',     'ocExtDuration');
-  const cardiacReasonSummary = buildReasonSummary(curRecs, 'ocCardiac', 'ocCardiacReasons', 'ocCardiacDuration');
+  const callReasonSummary    = buildReasonSummary(curRecs, 'ocCall',    'ocCallReasons',    'ocCallDuration',    'ocCallReasonHandlers');
+  const extReasonSummary     = buildReasonSummary(curRecs, 'ocExt',     'ocExtReasons',     'ocExtDuration',     'ocExtReasonHandlers');
+  const cardiacReasonSummary = buildReasonSummary(curRecs, 'ocCardiac', 'ocCardiacReasons', 'ocCardiacDuration', 'ocCardiacReasonHandlers');
   const hasReasonData = callReasonSummary || extReasonSummary || cardiacReasonSummary;
 
   // 資料テキスト生成
@@ -4662,25 +4868,28 @@ async function printReport() {
       return parts.length ? `（${parts.join(' ')}）` : '';
     };
     // 呼び出し理由集計（PDF用）
-    const buildPdfReason = (recs, ocKey, reasonKey, durKey) => {
+    const buildPdfReason = (recs, ocKey, reasonKey, durKey, handlerKey) => {
       const m = {};
       recs.forEach(r => {
         if (r[ocKey]!=='yes') return;
+        const handlers = r[handlerKey]||{};
         (r[reasonKey]||[]).forEach(name => {
-          if (!m[name]) m[name]={total:0,short:0,mid:0,long:0};
+          if (!m[name]) m[name]={total:0,short:0,mid:0,long:0,hc:{}};
           m[name].total++;
           if (r[durKey]) m[name][r[durKey]]++;
+          const h=handlers[name]; const hList=Array.isArray(h)?h:(h?[h]:[]); hList.forEach(hn=>{if(hn)m[name].hc[hn]=(m[name].hc[hn]||0)+1;});
         });
       });
       return Object.entries(m).sort((a,b)=>b[1].total-a[1].total).map(([name,d])=>{
         const dp=Object.entries(pdfDurLabel).filter(([k])=>d[k]>0).map(([k])=>`${pdfDurLabel[k]}:${d[k]}回`);
+        const hs=Object.entries(d.hc).sort((a,b)=>b[1]-a[1]).map(([n,v])=>`${n}:${v}回`).join('・');
         const s=name.length>18?name.slice(0,17)+'…':name;
-        return `${s}：${d.total}回${dp.length?`（${dp.join(' ')}）`:''}`;
+        return `${s}：${d.total}回${dp.length?`（${dp.join(' ')}）`:''}${hs?` ／ ${hs}`:''}`;
       });
     };
-    const pdfCallReasons    = buildPdfReason(curRecs,'ocCall',   'ocCallReasons',   'ocCallDuration');
-    const pdfExtReasons     = buildPdfReason(curRecs,'ocExt',    'ocExtReasons',    'ocExtDuration');
-    const pdfCardiacReasons = buildPdfReason(curRecs,'ocCardiac','ocCardiacReasons','ocCardiacDuration');
+    const pdfCallReasons    = buildPdfReason(curRecs,'ocCall',   'ocCallReasons',   'ocCallDuration',   'ocCallReasonHandlers');
+    const pdfExtReasons     = buildPdfReason(curRecs,'ocExt',    'ocExtReasons',    'ocExtDuration',    'ocExtReasonHandlers');
+    const pdfCardiacReasons = buildPdfReason(curRecs,'ocCardiac','ocCardiacReasons','ocCardiacDuration','ocCardiacReasonHandlers');
     const peakDays = [...curRecs].map(r=>({ date:r.date, dow:['日','月','火','水','木','金','土'][new Date(r.date+'T00:00:00').getDay()], staff:(r.staff||[]).join('・'), total:Object.values(r.tasks||{}).reduce((s,v)=>s+v,0)+(r.freeTasks||[]).reduce((s,ft)=>s+(ft.count||1),0) })).sort((a,b)=>b.total-a.total).slice(0,5);
     const top5 = Object.entries(taskTot).sort((a,b)=>b[1]-a[1]).slice(0,5);
     const top10 = Object.entries(taskTot).sort((a,b)=>b[1]-a[1]).slice(0,10);
@@ -4772,14 +4981,17 @@ async function printReport() {
     nl(1);
 
     // 業務種別TOP5
+    checkPage(20);
     y = sectionHeader('■ 業務種別 上位5項目', y); nl(2);
     const maxTop5 = top5.length ? top5[0][1] : 1;
-    top5.forEach(([name,val]) => { y = barRow(name, val, maxTop5, y, '#3b82f6'); }); nl(1);
+    top5.forEach(([name,val]) => { checkPage(8); y = barRow(name, val, maxTop5, y, '#3b82f6'); }); nl(1);
 
     // 時間帯別
+    checkPage(20);
     y = sectionHeader('■ 時間帯別 業務発生状況', y); nl(2);
     if (slotSum > 0) {
       [['準夜（16:30〜22:00）', slots.early, '#3b82f6'],['深夜（22:00〜翌3:30）', slots.mid, '#7c3aed'],['早朝（翌3:30〜9:00）', slots.late, '#06b6d4']].forEach(([l,v,c]) => {
+        checkPage(8);
         const pct = Math.round(v/slotSum*100);
         const bw = Math.max(1, (CW-LBAR-22)*pct/100);
         jpText(l, M, y, 9, '#1e293b');
@@ -4793,9 +5005,11 @@ async function printReport() {
     nl(1);
 
     // 今月の特記業務
+    checkPage(20);
     y = sectionHeader('■ 今月の特記業務', y, '#dc2626'); nl(2);
     const specialLines = buildSpecialReport(taskTot, nights, 'month').split('\n');
     specialLines.forEach(line => {
+      checkPage(6);
       const isDetail = line.startsWith('　');
       jpText(line.trimStart(), M + (isDetail ? 8 : 2), y, isDetail ? 7.5 : 8, isDetail ? '#64748b' : '#dc2626');
       y += isDetail ? 4 : 4.5;
@@ -4803,34 +5017,47 @@ async function printReport() {
     nl(1);
 
     // OC状況
+    checkPage(40);
     y = sectionHeader('■ オンコール状況', y); nl(2);
+
+    // OC担当
+    checkPage(8);
     jpText(`OC担当呼び出し：${ocCall}回（呼び出し率 ${ocRate}%）${pdfFmtDur(pdfCallDur)}`, M+2, y, 8, '#1e293b'); y += 5;
     const pdfCallStaffCnt={};
     curRecs.filter(r=>r.ocCall==='yes').forEach(r=>(r.oncall||[]).filter(n=>n&&n!=='なし').forEach(n=>{ pdfCallStaffCnt[n]=(pdfCallStaffCnt[n]||0)+1; }));
     const pdfCallStaffStr=Object.entries(pdfCallStaffCnt).sort((a,b)=>b[1]-a[1]).map(([n,v])=>`${n}：${v}回`).join('・');
-    if(pdfCallStaffStr){ jpText(`  呼び出されたスタッフ：${pdfCallStaffStr}`, M+4, y, 7, '#64748b'); y += 4; }
-    pdfCallReasons.forEach(line => { jpText(`  ${line}`, M+4, y, 7, '#64748b'); y += 4; });
+    if(pdfCallStaffStr){ checkPage(6); jpText(`  呼び出されたスタッフ：${pdfCallStaffStr}`, M+4, y, 7, '#64748b'); y += 4; }
+    pdfCallReasons.forEach(line => { checkPage(6); jpText(`  ${line}`, M+4, y, 7, '#64748b'); y += 4; });
+
+    // OC外
+    checkPage(8);
     jpText(`OC外呼び出し：${ocExt}回${pdfFmtDur(pdfExtDur)}`, M+2, y, 8, '#1e293b'); y += 5;
-    if(Object.keys(extCallerMap).length){ jpText(`  呼び出されたスタッフ：${Object.entries(extCallerMap).sort((a,b)=>b[1]-a[1]).map(([n,v])=>`${n}：${v}回`).join('・')}`, M+4, y, 7, '#64748b'); y += 4; }
-    pdfExtReasons.forEach(line => { jpText(`  ${line}`, M+4, y, 7, '#64748b'); y += 4; });
+    if(Object.keys(extCallerMap).length){ checkPage(6); jpText(`  呼び出されたスタッフ：${Object.entries(extCallerMap).sort((a,b)=>b[1]-a[1]).map(([n,v])=>`${n}：${v}回`).join('・')}`, M+4, y, 7, '#64748b'); y += 4; }
+    pdfExtReasons.forEach(line => { checkPage(6); jpText(`  ${line}`, M+4, y, 7, '#64748b'); y += 4; });
+
+    // 心外OC
+    checkPage(8);
     jpText(`心外OC呼び出し：${ocCardiacCnt}回${pdfFmtDur(pdfCardiacDur)}`, M+2, y, 8, '#1e293b'); y += 5;
     const pdfCardiacStaffCnt={};
     curRecs.filter(r=>r.ocCardiac==='yes').forEach(r=>(r.cardiacOncall||[]).forEach(n=>{ pdfCardiacStaffCnt[n]=(pdfCardiacStaffCnt[n]||0)+1; }));
     const pdfCardiacStaffStr=Object.entries(pdfCardiacStaffCnt).sort((a,b)=>b[1]-a[1]).map(([n,v])=>`${n}：${v}回`).join('・');
-    if(pdfCardiacStaffStr){ jpText(`  呼び出されたスタッフ：${pdfCardiacStaffStr}`, M+4, y, 7, '#64748b'); y += 4; }
-    pdfCardiacReasons.forEach(line => { jpText(`  ${line}`, M+4, y, 7, '#64748b'); y += 4; });
+    if(pdfCardiacStaffStr){ checkPage(6); jpText(`  呼び出されたスタッフ：${pdfCardiacStaffStr}`, M+4, y, 7, '#64748b'); y += 4; }
+    pdfCardiacReasons.forEach(line => { checkPage(6); jpText(`  ${line}`, M+4, y, 7, '#64748b'); y += 4; });
     nl(1);
 
     // 心外OC担当者
     if (cardiacReport.length) {
+      checkPage(12);
       y = sectionHeader('■ 心外オンコール 担当者別集計', y); nl(2);
       cardiacReport.forEach(d => {
+        checkPage(6);
         const rate = d.oncall ? Math.round(d.called/d.oncall*100) : 0;
         jpText(`${d.name}：担当${d.oncall}回 / 呼び出し${d.called}回（${rate}%）`, M+2, y, 8, '#1e293b'); y += 5;
       }); nl(1);
     }
 
     // 所見（3層構造）
+    checkPage(35);
     y = sectionHeader('■ 所見・課題', y, '#dc2626'); nl(2);
     const issueItems = [];
     const urgentItems = [];
