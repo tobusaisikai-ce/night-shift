@@ -1270,35 +1270,61 @@ function renderReasonChips(type) {
     };
     c.appendChild(chip);
 
-    // 理由が選択済みのとき → 全スタッフから担当者を選べる（1人夜勤でも複数選択可）
+    // 理由が選択済みのとき → 呼ばれたスタッフに応じて担当者を自動設定 or 選択UI表示
     if (reasons.has(name)) {
-      const handlerRow = document.createElement('div');
-      handlerRow.className = 'reason-handler-row';
-      const taskLabel = document.createElement('div');
-      taskLabel.className = 'reason-handler-task';
-      taskLabel.textContent = `↳ 対応者（複数可）`;
-      handlerRow.appendChild(taskLabel);
-      const chipRow = document.createElement('div');
-      chipRow.className = 'reason-handler-chips';
+      // タイプごとの「呼ばれたスタッフ」を取得
+      let calledStaff = [];
+      if (type === 'call') {
+        calledStaff = [...selOncall].filter(n => n && n !== 'なし');
+      } else if (type === 'ext') {
+        calledStaff = [...selExtCallers];
+      } else if (type === 'cardiac') {
+        calledStaff = [...selCardiacOncall];
+      }
+
       // handlers[name] を Set として扱う
       if (!(handlers[name] instanceof Set)) {
         const v = handlers[name];
         handlers[name] = Array.isArray(v) ? new Set(v) : (v && typeof v === 'string' ? new Set([v]) : new Set());
       }
-      // 全スタッフリストから選択
-      STAFF.forEach(staffName => {
-        const sc = document.createElement('span');
-        sc.className = 'rh-chip' + (handlers[name].has(staffName) ? ' sel' : '');
-        sc.textContent = staffName;
-        sc.onclick = () => {
-          if (handlers[name].has(staffName)) handlers[name].delete(staffName);
-          else handlers[name].add(staffName);
-          renderReasonChips(type);
-        };
-        chipRow.appendChild(sc);
-      });
-      handlerRow.appendChild(chipRow);
-      c.appendChild(handlerRow);
+
+      if (calledStaff.length === 1) {
+        // 1人のとき → 自動的にその人を対応者にセット（UI不要）
+        handlers[name] = new Set([calledStaff[0]]);
+        const autoLabel = document.createElement('div');
+        autoLabel.className = 'reason-handler-task';
+        autoLabel.textContent = `↳ 対応：${calledStaff[0]}（自動）`;
+        autoLabel.style.color = 'var(--accent)';
+        c.appendChild(autoLabel);
+      } else if (calledStaff.length >= 2) {
+        // 2人以上のとき → デフォルト全員選択済みで選択UI表示
+        // 初回表示時（未選択状態）は全員を自動選択
+        if (handlers[name].size === 0) {
+          handlers[name] = new Set(calledStaff);
+        }
+        const handlerRow = document.createElement('div');
+        handlerRow.className = 'reason-handler-row';
+        const taskLabel = document.createElement('div');
+        taskLabel.className = 'reason-handler-task';
+        taskLabel.textContent = `↳ 対応者（タップで変更可）`;
+        handlerRow.appendChild(taskLabel);
+        const chipRow = document.createElement('div');
+        chipRow.className = 'reason-handler-chips';
+        calledStaff.forEach(staffName => {
+          const sc = document.createElement('span');
+          sc.className = 'rh-chip' + (handlers[name].has(staffName) ? ' sel' : '');
+          sc.textContent = staffName;
+          sc.onclick = () => {
+            if (handlers[name].has(staffName)) handlers[name].delete(staffName);
+            else handlers[name].add(staffName);
+            renderReasonChips(type);
+          };
+          chipRow.appendChild(sc);
+        });
+        handlerRow.appendChild(chipRow);
+        c.appendChild(handlerRow);
+      }
+      // 0人のとき（呼ばれたスタッフ未選択）→ 何も表示しない
     }
   });
 }
