@@ -870,6 +870,18 @@ textarea { height: 76px; resize: vertical; font-size: 13px; line-height: 1.6; }
   </div>
 </div>
 
+<!-- 完了結果モーダル -->
+<div class="modal-overlay" id="result-modal">
+  <div class="modal-box" style="max-width:320px">
+    <div class="modal-icon" id="result-modal-icon">✅</div>
+    <div class="modal-title" id="result-modal-title"></div>
+    <div class="modal-body" id="result-modal-body"></div>
+    <div class="modal-btns" style="grid-template-columns:1fr">
+      <button class="modal-btn" style="background:var(--accent);color:#fff" onclick="closeResultModal()">閉じる</button>
+    </div>
+  </div>
+</div>
+
 <script>
 // ===================== DATA =====================
 const STAFF_GROUPS = [
@@ -5382,7 +5394,7 @@ async function resyncOne(date, e) {
   else showToast('❌ 送信失敗: '+result.error, '#ff6b6b');
 }
 
-// ===================== 全データ再送信 =====================
+// ===================== 全データ再送信（一括送信版） =====================
 async function resyncAllToSheet() {
   const url = getGasUrl();
   if (!url) { showToast('⚠ URLを設定してください','#ff9944'); return; }
@@ -5390,35 +5402,50 @@ async function resyncAllToSheet() {
   const recs = getRecords();
   if (!recs.length) { showToast('⚠ 送信するデータがありません','#ff9944'); return; }
 
-  if (!confirm(`ローカルの全${recs.length}件をスプレッドシートに再送信します。\n既存のスプレッドシートのデータは上書きされます。\n\nよろしいですか？`)) return;
+  if (!confirm(`ローカルの全${recs.length}件をスプレッドシートに一括再送信します。\n既存のスプレッドシートのデータは上書きされます。\n\nよろしいですか？`)) return;
 
   const btn = document.getElementById('resync-all-btn');
   btn.disabled = true;
+  btn.innerHTML = '<span class="spinning">⟳</span> 送信中...';
 
-  let success = 0, failed = 0;
-  for (let i = 0; i < recs.length; i++) {
-    btn.innerHTML = `<span class="spinning">⟳</span> 再送信中... ${i+1}/${recs.length}`;
-    const result = await syncRecord(recs[i]);
+  try {
+    const response = await fetch(url, {
+      method: 'POST',
+      mode: 'cors',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ bulk: recs })
+    });
+    if (!response.ok) throw new Error('HTTP ' + response.status);
+    const result = await response.json();
+
     if (result.ok) {
-      success++;
-      // syncStatusをdoneに更新
-      recs[i].syncStatus = 'done';
-      recs[i].syncedAt = new Date().toISOString();
+      // 全件をdoneに更新
+      const updated = recs.map(r => ({ ...r, syncStatus: 'done', syncedAt: new Date().toISOString() }));
+      localStorage.setItem('ce_v3', JSON.stringify(updated));
+      updateSyncStatus();
+      renderHistory();
+      // 完了モーダル表示
+      showResultModal('✅', '一括送信完了', `${result.count ?? recs.length}件をスプレッドシートに\n送信しました。`);
     } else {
-      failed++;
+      throw new Error(result.error || '不明なエラー');
     }
+  } catch (err) {
+    showResultModal('❌', '送信失敗', err.message);
   }
-
-  // ローカルのsyncStatusも更新
-  localStorage.setItem('ce_v3', JSON.stringify(recs));
 
   btn.disabled = false;
   btn.innerHTML = '🔁 全データをスプレッドシートに再送信';
-  updateSyncStatus();
-  renderHistory();
+}
 
-  if (failed === 0) showToast(`✅ 全${success}件の再送信が完了しました`);
-  else showToast(`⚠ 成功${success} / 失敗${failed}`, '#ff9944');
+function showResultModal(icon, title, body) {
+  document.getElementById('result-modal-icon').textContent = icon;
+  document.getElementById('result-modal-title').textContent = title;
+  document.getElementById('result-modal-body').innerHTML = body.replace(/\n/g, '<br>');
+  document.getElementById('result-modal').classList.add('show');
+}
+
+function closeResultModal() {
+  document.getElementById('result-modal').classList.remove('show');
 }
 
 // ===================== スプレッドシートからの復元 =====================
